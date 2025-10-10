@@ -13,11 +13,11 @@ import (
 
 type ShortenerService struct {
 	repo    repository.Repository
-	baseUrl string
+	baseURL string
 }
 
 func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
-	return &ShortenerService{repo: repo, baseUrl: baseURL}
+	return &ShortenerService{repo: repo, baseURL: baseURL}
 }
 
 func (s *ShortenerService) Shorten(orig string) (string, error) {
@@ -35,7 +35,7 @@ func (s *ShortenerService) Shorten(orig string) (string, error) {
 		return "", err
 	}
 
-	return s.baseUrl + "/" + id, nil
+	return s.baseURL + "/" + id, nil
 }
 
 func (s *ShortenerService) Resolve(id string) (string, error) {
