@@ -51,8 +51,6 @@ func handleShorten(w http.ResponseWriter, r *http.Request, service *service.Shor
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte(short))
-
-	// todo write body
 }
 
 func handleResolve(w http.ResponseWriter, r *http.Request, service *service.ShortenerService) {
