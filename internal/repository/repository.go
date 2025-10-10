@@ -10,8 +10,8 @@ import (
 var ErrNotFound = errors.New("url не найден")
 
 type Repository interface {
-	Save(url model.Url) error
-	Find(id string) (model.Url, error)
+	Save(url model.URL) error
+	Find(id string) (model.URL, error)
 }
 
 type inMemoryReposity struct {
@@ -25,20 +25,20 @@ func NewInMemoryRepository() Repository {
 	}
 }
 
-func (r *inMemoryReposity) Find(id string) (model.Url, error) {
+func (r *inMemoryReposity) Find(id string) (model.URL, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
 	orig, ok := r.data[id]
 
 	if !ok {
-		return model.Url{}, ErrNotFound
+		return model.URL{}, ErrNotFound
 	}
 
-	return model.Url{ID: id, Original: orig}, nil
+	return model.URL{ID: id, Original: orig}, nil
 }
 
-func (r *inMemoryReposity) Save(url model.Url) error {
+func (r *inMemoryReposity) Save(url model.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

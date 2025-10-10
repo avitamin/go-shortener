@@ -16,17 +16,17 @@ type ShortenerService struct {
 	baseUrl string
 }
 
-func NewShortenerService(repo repository.Repository, baseUrl string) *ShortenerService {
-	return &ShortenerService{repo: repo, baseUrl: baseUrl}
+func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
+	return &ShortenerService{repo: repo, baseUrl: baseURL}
 }
 
 func (s *ShortenerService) Shorten(orig string) (string, error) {
 	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
-		return "", errors.New("Некорректный url")
+		return "", errors.New("некорректный url")
 	}
 
 	id := generateID()
-	url := model.Url{
+	url := model.URL{
 		ID:       id,
 		Original: orig,
 	}

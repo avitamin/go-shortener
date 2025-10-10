@@ -15,7 +15,7 @@ func main() {
 	config := config.New()
 
 	repo := repository.NewInMemoryRepository()
-	svc := service.NewShortenerService(repo, config.BaseUrl)
+	svc := service.NewShortenerService(repo, config.BaseURL)
 	mux := handler.NewRouter(svc)
 
 	log.Printf("Запускаем сервер по адресу %s\n", config.Address)

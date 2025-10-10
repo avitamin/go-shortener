@@ -4,7 +4,7 @@ import "os"
 
 type Config struct {
 	Address string
-	BaseUrl string
+	BaseURL string
 }
 
 func New() *Config {
@@ -22,6 +22,6 @@ func New() *Config {
 
 	return &Config{
 		Address: address,
-		BaseUrl: base,
+		BaseURL: base,
 	}
 }
