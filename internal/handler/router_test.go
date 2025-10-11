@@ -49,6 +49,7 @@ func TestPOST_InvalidContentType(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 	resp := w.Result()
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -62,6 +63,7 @@ func TestPOST_EmptyBody(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 	resp := w.Result()
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
@@ -77,6 +79,7 @@ func TestGET_Success(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 	resp := w.Result()
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
 	assert.Equal(t, "https://ya.ru", resp.Header.Get("Location"))
@@ -90,6 +93,7 @@ func TestGET_NotFound(t *testing.T) {
 
 	router.ServeHTTP(w, req)
 	resp := w.Result()
+	defer resp.Body.Close()
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
