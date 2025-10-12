@@ -16,8 +16,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var (
+	cfg *config.Config
+)
+
+func init() {
+	cfg = config.New()
+}
+
 func setupRouter() http.Handler {
-	cfg := config.New()
 	repo := repository.NewInMemoryRepository()
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
 

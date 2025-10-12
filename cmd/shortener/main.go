@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 
@@ -13,6 +14,8 @@ import (
 func main() {
 
 	config := config.New()
+
+	flag.Parse()
 
 	repo := repository.NewInMemoryRepository()
 	svc := service.NewShortenerService(repo, config.BaseURL)
