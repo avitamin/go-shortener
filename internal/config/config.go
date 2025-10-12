@@ -1,6 +1,8 @@
 package config
 
-import "os"
+import (
+	"flag"
+)
 
 type Config struct {
 	Address string
@@ -8,20 +10,13 @@ type Config struct {
 }
 
 func New() *Config {
-	address := os.Getenv("SERVER_ADDRESS")
+	addr := flag.String("a", "localhost:8080", "адрес сервера (например localhost:8080)")
+	base := flag.String("b", "http://localhost:8080", "базовый URL (например http://localhost:8080)")
 
-	if address == "" {
-		address = "localhost:8080"
-	}
-
-	base := os.Getenv("BASE_URL")
-
-	if base == "" {
-		base = "http://localhost:8080"
-	}
+	flag.Parse()
 
 	return &Config{
-		Address: address,
-		BaseURL: base,
+		Address: *addr,
+		BaseURL: *base,
 	}
 }
