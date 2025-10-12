@@ -16,11 +16,11 @@ func main() {
 
 	repo := repository.NewInMemoryRepository()
 	svc := service.NewShortenerService(repo, config.BaseURL)
-	mux := handler.NewRouter(svc)
+	rtr := handler.NewRouter(svc)
 
 	log.Printf("Запускаем сервер по адресу %s\n", config.Address)
 
-	if error := http.ListenAndServe(config.Address, mux); error != nil {
+	if error := http.ListenAndServe(config.Address, rtr); error != nil {
 		log.Fatal(error)
 	}
 }
