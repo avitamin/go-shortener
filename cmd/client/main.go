@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"fmt"
 	"io"
 	"net/http"
@@ -14,9 +13,7 @@ import (
 )
 
 func main() {
-	cfg := config.New()
-
-	flag.Parse()
+	cfg := config.New(true)
 
 	endpoint := cfg.BaseURL + "/"
 	// контейнер данных для запроса

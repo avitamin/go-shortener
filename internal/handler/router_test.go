@@ -21,7 +21,7 @@ var (
 )
 
 func init() {
-	cfg = config.New()
+	cfg = config.New(false)
 }
 
 func setupRouter() http.Handler {
