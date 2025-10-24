@@ -1,18 +1,11 @@
 package config_test
 
 import (
-	"flag"
 	"os"
 	"testing"
 
 	"github.com/avitamin/go-shortener/internal/config"
 )
-
-func resetFlags() {
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-	flag.String("a", "localhost:8080", "адрес сервера")
-	flag.String("b", "http://localhost:8080", "базовый URL")
-}
 
 func TestConfig(t *testing.T) {
 	tests := []struct {
@@ -57,7 +50,6 @@ func TestConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetFlags()
 			os.Clearenv()
 
 			// установить переменные окружения
