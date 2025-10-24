@@ -2,11 +2,14 @@ package config
 
 import (
 	"flag"
+	"log"
+
+	"github.com/caarlos0/env/v6"
 )
 
 type Config struct {
-	Address string
-	BaseURL string
+	Address string `env:"SERVER_ADDRESS"`
+	BaseURL string `env:"BASE_URL"`
 }
 
 var (
@@ -25,8 +28,14 @@ func New(withParse bool) *Config {
 		flag.Parse()
 	}
 
-	return &Config{
+	cfg := &Config{
 		Address: addr,
 		BaseURL: base,
 	}
+
+	if err := env.Parse(cfg); err != nil {
+		log.Fatal(err)
+	}
+
+	return cfg
 }
