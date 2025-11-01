@@ -4,18 +4,25 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	lclmw "github.com/avitamin/go-shortener/internal/middleware"
 )
 
 func NewRouter(service *service.ShortenerService) http.Handler {
+	log := logger.New()
+
 	rtr := chi.NewRouter()
 
 	rtr.Use(middleware.RequestID)
 	rtr.Use(middleware.Logger)
 	rtr.Use(middleware.Recoverer)
+
+	rtr.Use(lclmw.ZapLogger(log))
 
 	rtr.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Type") != "text/plain" {
