@@ -13,6 +13,7 @@ import (
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
 
+	"github.com/goccy/go-json"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -90,6 +91,53 @@ func TestGET_Success(t *testing.T) {
 
 	assert.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
 	assert.Equal(t, "https://ya.ru", resp.Header.Get("Location"))
+}
+
+func TestShortenURL_Success(t *testing.T) {
+	router := setupRouter()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"url":"https://practicum.yandex.ru"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status 201, got %d", resp.StatusCode)
+	}
+
+	if contentType := resp.Header.Get("Content-Type"); contentType != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", contentType)
+	}
+
+	var data map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+
+	if _, ok := data["result"]; !ok {
+		t.Error("expected result field in response")
+	}
+}
+
+func TestShortenURL_BadRequest(t *testing.T) {
+	router := setupRouter()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"bad":"request"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", resp.StatusCode)
+	}
 }
 
 func TestGET_NotFound(t *testing.T) {
