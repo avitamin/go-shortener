@@ -1,6 +1,7 @@
 package handler_test
 
 import (
+	"compress/gzip"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -138,6 +139,58 @@ func TestShortenURL_BadRequest(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Errorf("expected status 400, got %d", resp.StatusCode)
 	}
+}
+
+func TestGzipRequest_Success(t *testing.T) {
+	router := setupRouter()
+
+	var buf strings.Builder
+	gzWriter := gzip.NewWriter(&buf)
+	gzWriter.Write([]byte("https://example.com"))
+	gzWriter.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(buf.String()))
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Type", "text/plain")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	body, _ := io.ReadAll(resp.Body)
+
+	assert.Contains(t, string(body), "http://localhost:8080/")
+}
+
+func TestGzipResponse_Success(t *testing.T) {
+	router := setupRouter()
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
+	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("Accept-Encoding", "gzip")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+
+	gzReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	body, _ := io.ReadAll(gzReader)
+
+	assert.Contains(t, string(body), "http://localhost:8080/")
 }
 
 func TestGET_NotFound(t *testing.T) {

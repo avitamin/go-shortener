@@ -25,6 +25,8 @@ func NewRouter(service *service.ShortenerService) http.Handler {
 	rtr.Use(middleware.Recoverer)
 
 	rtr.Use(lclmw.ZapLogger(log))
+	rtr.Use(lclmw.GzipRequest)
+	rtr.Use(lclmw.GzipResponse)
 
 	rtr.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Type") != "text/plain" {
