@@ -21,26 +21,26 @@ func TestConfig(t *testing.T) {
 			args:                []string{"cmd"},
 			wantAddress:         "localhost:8080",
 			wantBaseURL:         "http://localhost:8080",
-			wantFileStoragePath: "./storage",
+			wantFileStoragePath: "./runtime/storage",
 		},
 		{
 			name:                "flags override defaults",
-			args:                []string{"cmd", "-a=127.0.0.1:9001", "-b=http://127.0.0.1:9001", "-f=./new-storage"},
+			args:                []string{"cmd", "-a=127.0.0.1:9001", "-b=http://127.0.0.1:9001", "-f=./runtime/new-storage"},
 			wantAddress:         "127.0.0.1:9001",
 			wantBaseURL:         "http://127.0.0.1:9001",
-			wantFileStoragePath: "./new-storage",
+			wantFileStoragePath: "./runtime/new-storage",
 		},
 		{
 			name: "env override defaults",
 			env: map[string]string{
 				"SERVER_ADDRESS":    "0.0.0.0:9002",
 				"BASE_URL":          "http://0.0.0.0:9002",
-				"FILE_STORAGE_PATH": "./new-storage",
+				"FILE_STORAGE_PATH": "./runtime/new-storage",
 			},
 			args:                []string{"cmd"},
 			wantAddress:         "0.0.0.0:9002",
 			wantBaseURL:         "http://0.0.0.0:9002",
-			wantFileStoragePath: "./new-storage",
+			wantFileStoragePath: "./runtime/new-storage",
 		},
 		{
 			name: "env overrides flags",
@@ -50,7 +50,7 @@ func TestConfig(t *testing.T) {
 			args:                []string{"cmd", "-a=127.0.0.1:9003", "-b=http://127.0.0.1:9003"},
 			wantAddress:         "0.0.0.0:9999",
 			wantBaseURL:         "http://127.0.0.1:9003",
-			wantFileStoragePath: "./storage",
+			wantFileStoragePath: "./runtime/storage",
 		},
 	}
 

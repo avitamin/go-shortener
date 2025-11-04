@@ -14,7 +14,11 @@ func main() {
 
 	config := config.New(true)
 
-	repo := repository.NewInMemoryRepository()
+	repo, err := repository.NewFileStorageRepository(config.FileStoragePath)
+	if err != nil {
+		panic(err)
+	}
+
 	svc := service.NewShortenerService(repo, config.BaseURL)
 	rtr := handler.NewRouter(svc)
 

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -24,33 +25,47 @@ var (
 
 func init() {
 	cfg = config.New(false)
+
 }
 
-func setupRouter() http.Handler {
-	repo := repository.NewInMemoryRepository()
+func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.ShortenerService) {
+	tmpDir := t.TempDir()
+	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
+	cfg.FileStoragePath = tmpFilePath
+
+	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
+	if err != nil {
+		panic(err)
+	}
+
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
 
-	return handler.NewRouter(svc)
+	return handler.NewRouter(svc), repo, svc
 }
 
 func TestPOST_Success(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "text/plain")
+
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+
 	resp := w.Result()
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	assert.Contains(t, string(body), "http://localhost:8080/")
 }
 
 func TestPOST_InvalidContentType(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "application/json")
@@ -64,7 +79,8 @@ func TestPOST_InvalidContentType(t *testing.T) {
 }
 
 func TestPOST_EmptyBody(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	req.Header.Set("Content-Type", "text/plain")
@@ -78,10 +94,10 @@ func TestPOST_EmptyBody(t *testing.T) {
 }
 
 func TestGET_Success(t *testing.T) {
-	repo := repository.NewInMemoryRepository()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
+
 	_ = repo.Save(model.URL{ID: "xyz", Original: "https://ya.ru"})
-	svc := service.NewShortenerService(repo, "http://localhost:8080")
-	router := handler.NewRouter(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/xyz", nil)
 	w := httptest.NewRecorder()
@@ -95,7 +111,8 @@ func TestGET_Success(t *testing.T) {
 }
 
 func TestShortenURL_Success(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"url":"https://practicum.yandex.ru"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -125,7 +142,8 @@ func TestShortenURL_Success(t *testing.T) {
 }
 
 func TestShortenURL_BadRequest(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"bad":"request"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -142,7 +160,8 @@ func TestShortenURL_BadRequest(t *testing.T) {
 }
 
 func TestGzipRequest_Success(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	var buf strings.Builder
 	gzWriter := gzip.NewWriter(&buf)
@@ -167,7 +186,8 @@ func TestGzipRequest_Success(t *testing.T) {
 }
 
 func TestGzipResponse_Success(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "text/plain")
@@ -194,7 +214,8 @@ func TestGzipResponse_Success(t *testing.T) {
 }
 
 func TestGET_NotFound(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown", nil)
 	w := httptest.NewRecorder()
