@@ -12,19 +12,22 @@ import (
 
 func main() {
 
-	config := config.New(true)
-
-	repo, err := repository.NewFileStorageRepository(config.FileStoragePath)
+	cfg, err := config.New(true)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
-	svc := service.NewShortenerService(repo, config.BaseURL)
+	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	svc := service.NewShortenerService(repo, cfg.BaseURL)
 	rtr := handler.NewRouter(svc)
 
-	log.Printf("Запускаем сервер по адресу %s\n", config.Address)
+	log.Printf("Запускаем сервер по адресу %s\n", cfg.Address)
 
-	if error := http.ListenAndServe(config.Address, rtr); error != nil {
-		log.Fatal(error)
+	if err := http.ListenAndServe(cfg.Address, rtr); err != nil {
+		log.Fatal(err)
 	}
 }

@@ -65,7 +65,11 @@ func TestConfig(t *testing.T) {
 			defer os.Clearenv()
 
 			os.Args = tt.args
-			cfg := config.New(true)
+
+			cfg, err := config.New(true)
+			if err != nil {
+				t.Fatal(err)
+			}
 
 			if cfg.Address != tt.wantAddress {
 				t.Errorf("Address = %s, want %s", cfg.Address, tt.wantAddress)

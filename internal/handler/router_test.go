@@ -3,6 +3,7 @@ package handler_test
 import (
 	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -24,8 +25,12 @@ var (
 )
 
 func init() {
-	cfg = config.New(false)
+	config, err := config.New(false)
+	if err != nil {
+		log.Fatal(err)
+	}
 
+	cfg = config
 }
 
 func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.ShortenerService) {

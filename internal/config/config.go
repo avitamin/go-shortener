@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"log"
 	"path/filepath"
 
 	"github.com/caarlos0/env/v6"
@@ -26,7 +25,7 @@ func init() {
 	flag.StringVar(&storage, "f", "./runtime/storage", "путь к файлу хранилища (например ./runtime/storage)")
 }
 
-func New(withParse bool) *Config {
+func New(withParse bool) (*Config, error) {
 
 	if withParse {
 		flag.Parse()
@@ -39,8 +38,8 @@ func New(withParse bool) *Config {
 	}
 
 	if err := env.Parse(cfg); err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return cfg
+	return cfg, nil
 }
