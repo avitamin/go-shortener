@@ -28,7 +28,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	rtr.Use(middleware.Recoverer)
 
 	rtr.Use(lclmw.ZapLogger(log))
-	rtr.Use(lclmw.GzipRequest)
+	rtr.Use(lclmw.GzipRequest(log))
 	rtr.Use(lclmw.GzipResponse)
 
 	rtr.Post("/", func(w http.ResponseWriter, r *http.Request) {
