@@ -69,6 +69,7 @@ func NewRouter(service *service.ShortenerService) http.Handler {
 				return
 			}
 
+			log.Error(err.Error())
 			http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
 			return
 		}
@@ -107,7 +108,8 @@ func NewRouter(service *service.ShortenerService) http.Handler {
 		resp := model.ShortenResponse{Result: short}
 		respBytes, err := json.Marshal(resp)
 		if err != nil {
-			http.Error(w, "Ошибка сервера", http.StatusInternalServerError)
+			log.Error(err.Error())
+			http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
 			return
 		}
 
