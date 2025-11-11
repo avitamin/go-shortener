@@ -34,6 +34,7 @@ func init() {
 }
 
 func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.ShortenerService) {
+	t.Helper()
 	tmpDir := t.TempDir()
 	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
 	cfg.FileStoragePath = tmpFilePath
