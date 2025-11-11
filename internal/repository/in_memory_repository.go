@@ -7,19 +7,19 @@ import (
 )
 
 type inMemoryReposity struct {
-	mu   sync.RWMutex
+	mu   sync.Mutex
 	data map[string]string
 }
 
-func NewInMemoryRepository() Repository {
+func NewInMemoryRepository() *inMemoryReposity {
 	return &inMemoryReposity{
 		data: make(map[string]string),
 	}
 }
 
 func (r *inMemoryReposity) Find(id string) (model.URL, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	orig, ok := r.data[id]
 
@@ -38,8 +38,4 @@ func (r *inMemoryReposity) Save(url model.URL) error {
 
 	return nil
 
-}
-
-func (r *inMemoryReposity) Close() error {
-	return nil
 }

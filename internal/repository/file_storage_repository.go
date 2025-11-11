@@ -15,7 +15,7 @@ import (
 
 type fileStorageRepositoy struct {
 	mu      sync.Mutex
-	data    map[string]string
+	storage *inMemoryReposity
 	file    *os.File
 	writer  *bufio.Writer
 	encoder *json.Encoder
@@ -29,9 +29,9 @@ func NewFileStorageRepository(filePath string) (Repository, error) {
 	}
 
 	r := &fileStorageRepositoy{
-		data:   make(map[string]string),
-		file:   file,
-		writer: bufio.NewWriter(file),
+		storage: NewInMemoryRepository(),
+		file:    file,
+		writer:  bufio.NewWriter(file),
 	}
 
 	r.encoder = json.NewEncoder(r.writer)
@@ -44,23 +44,13 @@ func NewFileStorageRepository(filePath string) (Repository, error) {
 }
 
 func (r *fileStorageRepositoy) Find(id string) (model.URL, error) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	orig, ok := r.data[id]
-
-	if !ok {
-		return model.URL{}, ErrNotFound
-	}
-
-	return model.URL{ID: id, Original: orig}, nil
+	return r.storage.Find(id)
 }
 
 func (r *fileStorageRepositoy) Save(url model.URL) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
-	r.data[url.ID] = url.Original
+	if err := r.storage.Save(url); err != nil {
+		return err
+	}
 
 	url.UUID = uuid.New().String()
 
@@ -96,7 +86,7 @@ func (r *fileStorageRepositoy) loadFromFile() error {
 			// пропускаем битые строки
 			continue
 		}
-		r.data[u.ID] = u.Original
+		r.storage.Save(u)
 	}
 	return nil
 }
