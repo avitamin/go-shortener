@@ -14,7 +14,7 @@ import (
 )
 
 type fileStorageRepositoy struct {
-	mu      sync.RWMutex
+	mu      sync.Mutex
 	data    map[string]string
 	file    *os.File
 	writer  *bufio.Writer
@@ -44,8 +44,8 @@ func NewFileStorageRepository(filePath string) (Repository, error) {
 }
 
 func (r *fileStorageRepositoy) Find(id string) (model.URL, error) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
+	r.mu.Lock()
+	defer r.mu.Unlock()
 
 	orig, ok := r.data[id]
 
