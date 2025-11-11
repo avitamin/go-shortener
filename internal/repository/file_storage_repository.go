@@ -37,7 +37,7 @@ func NewFileStorageRepository(filePath string) (Repository, error) {
 	r.encoder = json.NewEncoder(r.writer)
 
 	if err := r.loadFromFile(); err != nil {
-		panic(err)
+		return r, err
 	}
 
 	return r, nil
