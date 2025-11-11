@@ -23,7 +23,10 @@ func main() {
 	}
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
-	rtr := handler.NewRouter(svc)
+	rtr, err := handler.NewRouter(svc)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	log.Printf("Запускаем сервер по адресу %s\n", cfg.Address)
 

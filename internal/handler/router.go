@@ -15,8 +15,11 @@ import (
 	"github.com/avitamin/go-shortener/internal/model"
 )
 
-func NewRouter(service *service.ShortenerService) http.Handler {
-	log := logger.New()
+func NewRouter(service *service.ShortenerService) (http.Handler, error) {
+	log, err := logger.New()
+	if err != nil {
+		return nil, err
+	}
 
 	rtr := chi.NewRouter()
 
@@ -119,5 +122,5 @@ func NewRouter(service *service.ShortenerService) http.Handler {
 		w.Write(respBytes)
 	})
 
-	return rtr
+	return rtr, nil
 }

@@ -45,7 +45,12 @@ func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.Sh
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
 
-	return handler.NewRouter(svc), repo, svc
+	handler, err := handler.NewRouter(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return handler, repo, svc
 }
 
 func TestPOST_Success(t *testing.T) {
