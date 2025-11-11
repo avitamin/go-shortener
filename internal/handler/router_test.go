@@ -40,7 +40,7 @@ func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.Sh
 
 	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
 	if err != nil {
-		panic(err)
+		t.Fatal(err)
 	}
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
