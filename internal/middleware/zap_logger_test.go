@@ -25,6 +25,6 @@ func TestZapLogger(t *testing.T) {
 	r.ServeHTTP(w, req)
 
 	if w.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", w.Code)
+		t.Fatalf("expected status %d, got %d", http.StatusOK, w.Code)
 	}
 }
