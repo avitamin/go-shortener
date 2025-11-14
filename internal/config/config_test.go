@@ -15,6 +15,7 @@ func TestConfig(t *testing.T) {
 		wantAddress         string
 		wantBaseURL         string
 		wantFileStoragePath string
+		wantDatabaseDsn     string
 	}{
 		{
 			name:                "defaults only",
@@ -22,13 +23,15 @@ func TestConfig(t *testing.T) {
 			wantAddress:         "localhost:8080",
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/postgres?sslmode=disable",
 		},
 		{
 			name:                "flags override defaults",
-			args:                []string{"cmd", "-a=127.0.0.1:9001", "-b=http://127.0.0.1:9001", "-f=./runtime/new-storage"},
+			args:                []string{"cmd", "-a=127.0.0.1:9001", "-b=http://127.0.0.1:9001", "-f=./runtime/new-storage", "-d=postgres://postgres:postgres@db:5432/new_db"},
 			wantAddress:         "127.0.0.1:9001",
 			wantBaseURL:         "http://127.0.0.1:9001",
 			wantFileStoragePath: "./runtime/new-storage",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/new_db",
 		},
 		{
 			name: "env override defaults",
@@ -36,21 +39,27 @@ func TestConfig(t *testing.T) {
 				"SERVER_ADDRESS":    "0.0.0.0:9002",
 				"BASE_URL":          "http://0.0.0.0:9002",
 				"FILE_STORAGE_PATH": "./runtime/new-storage",
+				"DATABASE_DSN":      "postgres://postgres:postgres@db:5432/env_db",
 			},
 			args:                []string{"cmd"},
 			wantAddress:         "0.0.0.0:9002",
 			wantBaseURL:         "http://0.0.0.0:9002",
 			wantFileStoragePath: "./runtime/new-storage",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
 		},
 		{
 			name: "env overrides flags",
 			env: map[string]string{
-				"SERVER_ADDRESS": "0.0.0.0:9999",
+				"SERVER_ADDRESS":    "0.0.0.0:9999",
+				"BASE_URL":          "http://127.0.0.1:9994",
+				"FILE_STORAGE_PATH": "./runtime/env_storage",
+				"DATABASE_DSN":      "postgres://postgres:postgres@db:5432/env_db",
 			},
-			args:                []string{"cmd", "-a=127.0.0.1:9003", "-b=http://127.0.0.1:9003"},
+			args:                []string{"cmd", "-a=127.0.0.1:9003", "-b=http://127.0.0.1:9003", "-f=./runtime/flag_storage", "-d=postgres://postgres:postgres@db:5432/flag_db"},
 			wantAddress:         "0.0.0.0:9999",
-			wantBaseURL:         "http://127.0.0.1:9003",
-			wantFileStoragePath: "./runtime/storage",
+			wantBaseURL:         "http://127.0.0.1:9994",
+			wantFileStoragePath: "./runtime/env_storage",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
 		},
 	}
 
