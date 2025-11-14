@@ -54,6 +54,39 @@ func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.Sh
 	return handler, repo, svc
 }
 
+func TestPing(t *testing.T) {
+	tests := []struct {
+		name       string
+		wantStatus int
+	}{
+		{
+			name:       "success",
+			wantStatus: http.StatusOK,
+		},
+		// {
+		// 	name:       "fails if timeout",
+		// 	wantStatus: http.StatusInternalServerError,
+		// },
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router, repo, _ := setupRouter(t)
+			defer repo.Close()
+
+			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
+			w := httptest.NewRecorder()
+
+			router.ServeHTTP(w, req)
+			resp := w.Result()
+			defer resp.Body.Close()
+
+			assert.Equal(t, tt.wantStatus, resp.StatusCode)
+		})
+	}
+
+}
+
 func TestPOST_Success(t *testing.T) {
 	router, repo, _ := setupRouter(t)
 	defer repo.Close()

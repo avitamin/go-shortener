@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/rand"
+	"database/sql"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -14,6 +15,7 @@ import (
 type ShortenerService struct {
 	repo    repository.Repository
 	baseURL string
+	Db      *sql.DB
 }
 
 func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {

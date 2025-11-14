@@ -1,8 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
@@ -17,12 +20,20 @@ func main() {
 		log.Fatal(err)
 	}
 
+	db, err := sql.Open("pgx", cfg.DatabaseDsn)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+
 	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
+	svc.Db = db
+
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {
 		log.Fatal(err)

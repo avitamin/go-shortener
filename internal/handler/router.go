@@ -1,8 +1,10 @@
 package handler
 
 import (
+	"context"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -73,7 +75,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			}
 
 			log.Error(err.Error())
-			http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
@@ -112,7 +114,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		respBytes, err := json.Marshal(resp)
 		if err != nil {
 			log.Error(err.Error())
-			http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
@@ -120,6 +122,20 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(http.StatusCreated)
 
 		w.Write(respBytes)
+	})
+
+	rtr.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+		defer cancel()
+
+		if err := service.Db.PingContext(ctx); err != nil {
+
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
 	})
 
 	return rtr, nil
