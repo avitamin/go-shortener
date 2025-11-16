@@ -1,9 +1,12 @@
 package handler_test
 
 import (
+	"compress/gzip"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -13,6 +16,7 @@ import (
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
 
+	"github.com/goccy/go-json"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,34 +25,58 @@ var (
 )
 
 func init() {
-	cfg = config.New(false)
+	config, err := config.New(false)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cfg = config
 }
 
-func setupRouter() http.Handler {
-	repo := repository.NewInMemoryRepository()
+func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.ShortenerService) {
+	t.Helper()
+	tmpDir := t.TempDir()
+	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
+	cfg.FileStoragePath = tmpFilePath
+
+	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
 
-	return handler.NewRouter(svc)
+	handler, err := handler.NewRouter(svc)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return handler, repo, svc
 }
 
 func TestPOST_Success(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "text/plain")
+
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, req)
+
 	resp := w.Result()
 	defer resp.Body.Close()
 
 	body, _ := io.ReadAll(resp.Body)
+
 	assert.Equal(t, http.StatusCreated, resp.StatusCode)
 	assert.Contains(t, string(body), "http://localhost:8080/")
 }
 
 func TestPOST_InvalidContentType(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "application/json")
@@ -62,7 +90,8 @@ func TestPOST_InvalidContentType(t *testing.T) {
 }
 
 func TestPOST_EmptyBody(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	req.Header.Set("Content-Type", "text/plain")
@@ -76,10 +105,10 @@ func TestPOST_EmptyBody(t *testing.T) {
 }
 
 func TestGET_Success(t *testing.T) {
-	repo := repository.NewInMemoryRepository()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
+
 	_ = repo.Save(model.URL{ID: "xyz", Original: "https://ya.ru"})
-	svc := service.NewShortenerService(repo, "http://localhost:8080")
-	router := handler.NewRouter(svc)
 
 	req := httptest.NewRequest(http.MethodGet, "/xyz", nil)
 	w := httptest.NewRecorder()
@@ -92,8 +121,112 @@ func TestGET_Success(t *testing.T) {
 	assert.Equal(t, "https://ya.ru", resp.Header.Get("Location"))
 }
 
+func TestShortenURL_Success(t *testing.T) {
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"url":"https://practicum.yandex.ru"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusCreated {
+		t.Errorf("expected status 201, got %d", resp.StatusCode)
+	}
+
+	if contentType := resp.Header.Get("Content-Type"); contentType != "application/json" {
+		t.Errorf("expected Content-Type application/json, got %s", contentType)
+	}
+
+	var data map[string]string
+	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+		t.Fatalf("invalid json response: %v", err)
+	}
+
+	if _, ok := data["result"]; !ok {
+		t.Error("expected result field in response")
+	}
+}
+
+func TestShortenURL_BadRequest(t *testing.T) {
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"bad":"request"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Errorf("expected status 400, got %d", resp.StatusCode)
+	}
+}
+
+func TestGzipRequest_Success(t *testing.T) {
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
+
+	var buf strings.Builder
+	gzWriter := gzip.NewWriter(&buf)
+	gzWriter.Write([]byte("https://example.com"))
+	gzWriter.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(buf.String()))
+	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("Content-Type", "text/plain")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	body, _ := io.ReadAll(resp.Body)
+
+	assert.Contains(t, string(body), "http://localhost:8080/")
+}
+
+func TestGzipResponse_Success(t *testing.T) {
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
+	req.Header.Set("Content-Type", "text/plain")
+	req.Header.Set("Accept-Encoding", "gzip")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+	assert.Equal(t, "gzip", resp.Header.Get("Content-Encoding"))
+
+	gzReader, err := gzip.NewReader(resp.Body)
+	if err != nil {
+		t.Fatalf("failed to create gzip reader: %v", err)
+	}
+	defer gzReader.Close()
+
+	body, _ := io.ReadAll(gzReader)
+
+	assert.Contains(t, string(body), "http://localhost:8080/")
+}
+
 func TestGET_NotFound(t *testing.T) {
-	router := setupRouter()
+	router, repo, _ := setupRouter(t)
+	defer repo.Close()
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown", nil)
 	w := httptest.NewRecorder()

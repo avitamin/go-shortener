@@ -1,6 +1,15 @@
 package model
 
 type URL struct {
-	ID       string
-	Original string
+	UUID     string `json:"uuid"`
+	ID       string `json:"short_url"`
+	Original string `json:"original_url"`
+}
+
+type ShortenRequest struct {
+	URL string `json:"url"`
+}
+
+type ShortenResponse struct {
+	Result string `json:"result"`
 }

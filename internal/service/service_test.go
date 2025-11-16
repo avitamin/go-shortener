@@ -11,24 +11,28 @@ import (
 
 // mock repository for isolation
 type mockRepo struct {
-	store map[string]string
+	data map[string]string
 }
 
 func newMockRepo() *mockRepo {
-	return &mockRepo{store: make(map[string]string)}
+	return &mockRepo{data: make(map[string]string)}
 }
 
 func (m *mockRepo) Save(url model.URL) error {
-	m.store[url.ID] = url.Original
+	m.data[url.ID] = url.Original
 	return nil
 }
 
 func (m *mockRepo) Find(id string) (model.URL, error) {
-	val, ok := m.store[id]
+	val, ok := m.data[id]
 	if !ok {
 		return model.URL{}, repository.ErrNotFound
 	}
 	return model.URL{ID: id, Original: val}, nil
+}
+
+func (m *mockRepo) Close() error {
+	return nil
 }
 
 func TestShorten_Success(t *testing.T) {
@@ -38,7 +42,7 @@ func TestShorten_Success(t *testing.T) {
 	shortURL, err := svc.Shorten("https://yandex.ru")
 	assert.NoError(t, err)
 	assert.Contains(t, shortURL, "http://localhost:8080/")
-	assert.Len(t, repo.store, 1)
+	assert.Len(t, repo.data, 1)
 }
 
 func TestShorten_InvalidURL(t *testing.T) {

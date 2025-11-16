@@ -51,7 +51,7 @@ func (s *ShortenerService) Resolve(id string) (string, error) {
 
 func generateID() string {
 	b := make([]byte, 6)
-	_, _ = io.ReadFull(rand.Reader, b)
+	io.ReadFull(rand.Reader, b)
 
 	return base64.URLEncoding.EncodeToString(b)
 }

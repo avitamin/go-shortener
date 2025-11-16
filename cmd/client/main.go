@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -13,7 +14,11 @@ import (
 )
 
 func main() {
-	cfg := config.New(true)
+
+	cfg, err := config.New(true)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	endpoint := cfg.BaseURL + "/"
 	// контейнер данных для запроса
