@@ -9,8 +9,6 @@ services:
       - db
     environment:
       - DATABASE_DSN=postgres://postgres:postgres@db:5432/shortener?sslmode=disable
-    volumes:
-      - .:/app
     command: ["./main"]
     restart: unless-stopped
 
