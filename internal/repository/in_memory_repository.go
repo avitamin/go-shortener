@@ -6,18 +6,18 @@ import (
 	"github.com/avitamin/go-shortener/internal/model"
 )
 
-type inMemoryReposity struct {
+type inMemoryStorage struct {
 	mu   sync.Mutex
 	data map[string]string
 }
 
-func NewInMemoryRepository() *inMemoryReposity {
-	return &inMemoryReposity{
+func NewInMemoryStorage() *inMemoryStorage {
+	return &inMemoryStorage{
 		data: make(map[string]string),
 	}
 }
 
-func (r *inMemoryReposity) Find(id string) (model.URL, error) {
+func (r *inMemoryStorage) Find(id string) (model.URL, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -30,7 +30,7 @@ func (r *inMemoryReposity) Find(id string) (model.URL, error) {
 	return model.URL{ID: id, Original: orig}, nil
 }
 
-func (r *inMemoryReposity) Save(url model.URL) error {
+func (r *inMemoryStorage) Save(url model.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

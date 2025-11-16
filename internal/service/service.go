@@ -1,8 +1,8 @@
 package service
 
 import (
+	"context"
 	"crypto/rand"
-	"database/sql"
 	"encoding/base64"
 	"errors"
 	"io"
@@ -15,7 +15,7 @@ import (
 type ShortenerService struct {
 	repo    repository.Repository
 	baseURL string
-	DB      *sql.DB
+	db      Pinger
 }
 
 func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
@@ -49,6 +49,28 @@ func (s *ShortenerService) Resolve(id string) (string, error) {
 
 	return url.Original, nil
 
+}
+
+type Pinger interface {
+	PingContext(ctx context.Context) error
+}
+
+func (s *ShortenerService) PingContext(ctx context.Context) error {
+	if s.db == nil {
+		panic("не задано свойство db")
+	}
+
+	if err := s.db.PingContext(ctx); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *ShortenerService) AttachDB(db Pinger) error {
+	s.db = db
+
+	return nil
 }
 
 func generateID() string {

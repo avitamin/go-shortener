@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"compress/gzip"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -15,6 +16,9 @@ import (
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
+	"github.com/avitamin/go-shortener/internal/service/mock"
+
+	"github.com/golang/mock/gomock"
 
 	"github.com/goccy/go-json"
 	"github.com/stretchr/testify/assert"
@@ -35,6 +39,7 @@ func init() {
 
 func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.ShortenerService) {
 	t.Helper()
+
 	tmpDir := t.TempDir()
 	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
 	cfg.FileStoragePath = tmpFilePath
@@ -57,22 +62,33 @@ func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.Sh
 func TestPing(t *testing.T) {
 	tests := []struct {
 		name       string
+		pingResult error
 		wantStatus int
 	}{
 		{
 			name:       "success",
+			pingResult: nil,
 			wantStatus: http.StatusOK,
 		},
-		// {
-		// 	name:       "fails if timeout",
-		// 	wantStatus: http.StatusInternalServerError,
-		// },
+		{
+			name:       "fails if timeout",
+			pingResult: errors.New("истекло время ожидания"),
+			wantStatus: http.StatusInternalServerError,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router, repo, _ := setupRouter(t)
+			router, repo, svc := setupRouter(t)
 			defer repo.Close()
+
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			m := mock.NewMockPinger(ctrl)
+			m.EXPECT().PingContext(gomock.Any()).Return(tt.pingResult)
+
+			svc.AttachDB(m)
 
 			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			w := httptest.NewRecorder()

@@ -15,7 +15,7 @@ import (
 
 type fileStorageRepositoy struct {
 	mu      sync.Mutex
-	storage *inMemoryReposity
+	storage *inMemoryStorage
 	file    *os.File
 	writer  *bufio.Writer
 	encoder *json.Encoder
@@ -29,7 +29,7 @@ func NewFileStorageRepository(filePath string) (Repository, error) {
 	}
 
 	r := &fileStorageRepositoy{
-		storage: NewInMemoryRepository(),
+		storage: NewInMemoryStorage(),
 		file:    file,
 		writer:  bufio.NewWriter(file),
 	}
