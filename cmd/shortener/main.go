@@ -32,7 +32,7 @@ func main() {
 	}
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
-	svc.Db = db
+	svc.DB = db
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {

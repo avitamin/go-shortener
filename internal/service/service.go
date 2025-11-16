@@ -15,7 +15,7 @@ import (
 type ShortenerService struct {
 	repo    repository.Repository
 	baseURL string
-	Db      *sql.DB
+	DB      *sql.DB
 }
 
 func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
