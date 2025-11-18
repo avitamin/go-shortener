@@ -2,7 +2,6 @@ package config
 
 import (
 	"flag"
-	"path/filepath"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -17,14 +16,14 @@ type Config struct {
 var (
 	addr        string
 	base        string
-	storage     string
+	filePath    string
 	databaseDsn string
 )
 
 func init() {
 	flag.StringVar(&addr, "a", "localhost:8080", "адрес сервера (например localhost:8080)")
 	flag.StringVar(&base, "b", "http://localhost:8080", "базовый URL (например http://localhost:8080)")
-	flag.StringVar(&storage, "f", "", "путь к файлу хранилища (например ./runtime/storage)")
+	flag.StringVar(&filePath, "f", "", "путь к файлу хранилища (например ./runtime/storage)")
 	flag.StringVar(&databaseDsn, "d", "", "путь к файлу хранилища (например postgres://postgres:postgres@db:5432/postgres)")
 }
 
@@ -37,7 +36,7 @@ func New(withParse bool) (*Config, error) {
 	cfg := &Config{
 		Address:         addr,
 		BaseURL:         base,
-		FileStoragePath: filepath.Clean(storage),
+		FileStoragePath: filePath,
 		DatabaseDsn:     databaseDsn,
 	}
 
