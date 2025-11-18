@@ -19,7 +19,7 @@ func newMockRepo() *mockRepo {
 }
 
 func (m *mockRepo) Save(url model.URL) error {
-	m.data[url.ID] = url.Original
+	m.data[url.Short] = url.Original
 	return nil
 }
 
@@ -28,7 +28,7 @@ func (m *mockRepo) Find(id string) (model.URL, error) {
 	if !ok {
 		return model.URL{}, repository.ErrNotFound
 	}
-	return model.URL{ID: id, Original: val}, nil
+	return model.URL{Short: id, Original: val}, nil
 }
 
 func (m *mockRepo) Close() error {
@@ -58,7 +58,7 @@ func TestResolve_Success(t *testing.T) {
 	repo := newMockRepo()
 	svc := service.NewShortenerService(repo, "http://localhost:8080")
 
-	url := model.URL{ID: "abc123", Original: "https://ya.ru"}
+	url := model.URL{Short: "abc123", Original: "https://ya.ru"}
 	_ = repo.Save(url)
 
 	result, err := svc.Resolve("abc123")

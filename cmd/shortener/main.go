@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"log"
 	"net/http"
 
@@ -20,19 +19,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	db, err := sql.Open("pgx", cfg.DatabaseDsn)
+	repo, err := repository.NewRepository(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
-
-	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
-	if err != nil {
-		log.Fatal(err)
-	}
+	defer repo.Close()
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
-	svc.AttachDB(db)
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {

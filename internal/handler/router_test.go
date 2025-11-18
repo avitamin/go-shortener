@@ -44,7 +44,7 @@ func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.Sh
 	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
 	cfg.FileStoragePath = tmpFilePath
 
-	repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
+	repo, err := repository.NewRepository(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +157,7 @@ func TestGET_Success(t *testing.T) {
 	router, repo, _ := setupRouter(t)
 	defer repo.Close()
 
-	_ = repo.Save(model.URL{ID: "xyz", Original: "https://ya.ru"})
+	_ = repo.Save(model.URL{Short: "xyz", Original: "https://ya.ru"})
 
 	req := httptest.NewRequest(http.MethodGet, "/xyz", nil)
 	w := httptest.NewRecorder()

@@ -2,7 +2,7 @@ package model
 
 type URL struct {
 	UUID     string `json:"uuid"`
-	ID       string `json:"short_url"`
+	Short    string `json:"short_url"`
 	Original string `json:"original_url"`
 }
 

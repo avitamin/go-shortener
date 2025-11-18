@@ -29,7 +29,7 @@ func (s *ShortenerService) Shorten(orig string) (string, error) {
 
 	id := generateID()
 	url := model.URL{
-		ID:       id,
+		Short:    id,
 		Original: orig,
 	}
 

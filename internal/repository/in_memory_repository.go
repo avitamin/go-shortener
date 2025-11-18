@@ -27,15 +27,19 @@ func (r *inMemoryStorage) Find(id string) (model.URL, error) {
 		return model.URL{}, ErrNotFound
 	}
 
-	return model.URL{ID: id, Original: orig}, nil
+	return model.URL{Short: id, Original: orig}, nil
 }
 
 func (r *inMemoryStorage) Save(url model.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.data[url.ID] = url.Original
+	r.data[url.Short] = url.Original
 
 	return nil
 
+}
+
+func (r *inMemoryStorage) Close() error {
+	return nil
 }
