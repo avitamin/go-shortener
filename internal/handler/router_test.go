@@ -44,7 +44,7 @@ func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.Sh
 	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
 	cfg.FileStoragePath = tmpFilePath
 
-	repo, err := repository.NewRepository(cfg)
+	repo, err := repository.New(cfg)
 	if err != nil {
 		t.Fatal(err)
 	}

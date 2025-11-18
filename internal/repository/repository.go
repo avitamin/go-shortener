@@ -16,7 +16,7 @@ type Repository interface {
 	Close() error
 }
 
-func NewRepository(cfg *config.Config) (Repository, error) {
+func New(cfg *config.Config) (Repository, error) {
 	var repo Repository
 	var err error
 

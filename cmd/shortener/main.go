@@ -19,7 +19,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	repo, err := repository.NewRepository(cfg)
+	repo, err := repository.New(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
