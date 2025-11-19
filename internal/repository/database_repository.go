@@ -37,7 +37,7 @@ func (r *DataBaseRepository) Save(url model.URL) error {
 		return err
 	}
 
-	_, err = r.db.Exec("INSERT INTO urls (id, original) VALUES ($1, $2)", url.Short, url.Original)
+	_, err = r.db.Exec("INSERT INTO urls (short, original) VALUES ($1, $2)", url.Short, url.Original)
 	if err != nil {
 		return err
 	}
@@ -55,7 +55,7 @@ func (r *DataBaseRepository) PingContext(ctx context.Context) error {
 }
 
 func (r *DataBaseRepository) queryUrls(ctx context.Context) error {
-	rows, err := r.db.QueryContext(ctx, "SELECT id, original FROM urls")
+	rows, err := r.db.QueryContext(ctx, "SELECT short, original FROM urls")
 	if err != nil {
 		return err
 	}
