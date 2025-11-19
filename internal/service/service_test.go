@@ -1,6 +1,8 @@
 package service_test
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/avitamin/go-shortener/internal/model"
@@ -33,6 +35,10 @@ func (m *mockRepo) Find(id string) (model.URL, error) {
 
 func (m *mockRepo) Close() error {
 	return nil
+}
+
+func (m *mockRepo) PingContext(ctx context.Context) error {
+	return errors.New("db not found")
 }
 
 func TestShorten_Success(t *testing.T) {

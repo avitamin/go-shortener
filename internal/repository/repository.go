@@ -1,8 +1,11 @@
 package repository
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
@@ -14,6 +17,7 @@ type Repository interface {
 	Save(url model.URL) error
 	Find(id string) (model.URL, error)
 	Close() error
+	PingContext(ctx context.Context) error
 }
 
 func New(cfg *config.Config) (Repository, error) {

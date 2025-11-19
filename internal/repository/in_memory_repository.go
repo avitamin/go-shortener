@@ -1,6 +1,8 @@
 package repository
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	"github.com/avitamin/go-shortener/internal/model"
@@ -42,4 +44,8 @@ func (r *inMemoryStorage) Save(url model.URL) error {
 
 func (r *inMemoryStorage) Close() error {
 	return nil
+}
+
+func (r *inMemoryStorage) PingContext(ctx context.Context) error {
+	return errors.New("db not configured")
 }

@@ -50,6 +50,10 @@ func (r *DataBaseRepository) Close() error {
 	return nil
 }
 
+func (r *DataBaseRepository) PingContext(ctx context.Context) error {
+	return r.db.PingContext(ctx)
+}
+
 func (r *DataBaseRepository) queryUrls(ctx context.Context) error {
 	rows, err := r.db.QueryContext(ctx, "SELECT id, original FROM urls")
 	if err != nil {

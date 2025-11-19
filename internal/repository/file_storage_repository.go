@@ -2,6 +2,7 @@ package repository
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -65,6 +66,10 @@ func (r *fileStorageRepositoy) Save(url model.URL) error {
 
 	return r.file.Sync()
 
+}
+
+func (r *fileStorageRepositoy) PingContext(ctx context.Context) error {
+	return errors.New("db not configured")
 }
 
 func (r *fileStorageRepositoy) loadFromFile() error {

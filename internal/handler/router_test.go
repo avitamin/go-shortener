@@ -15,8 +15,8 @@ import (
 	"github.com/avitamin/go-shortener/internal/handler"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
+	mock_repository "github.com/avitamin/go-shortener/internal/repository/mock"
 	"github.com/avitamin/go-shortener/internal/service"
-	"github.com/avitamin/go-shortener/internal/service/mock"
 
 	"github.com/golang/mock/gomock"
 
@@ -29,34 +29,52 @@ var (
 )
 
 func init() {
-	config, err := config.New(false)
+	var err error
+
+	cfg, err = config.New(false)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	cfg = config
 }
 
-func setupRouter(t *testing.T) (http.Handler, repository.Repository, *service.ShortenerService) {
+func setupRepository(t *testing.T, repoType string) (repo repository.Repository, err error) {
 	t.Helper()
 
-	tmpDir := t.TempDir()
-	tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
-	cfg.FileStoragePath = tmpFilePath
+	switch repoType {
+	case "database":
 
-	repo, err := repository.New(cfg)
-	if err != nil {
-		t.Fatal(err)
+	case "file":
+		tmpDir := t.TempDir()
+		tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
+		cfg.FileStoragePath = tmpFilePath
+
 	}
+
+	repo, err = repository.New(cfg)
+	if err != nil {
+		return nil, err
+	}
+
+	return repo, nil
+}
+
+func setupService(t *testing.T, repo repository.Repository) *service.ShortenerService {
+	t.Helper()
 
 	svc := service.NewShortenerService(repo, cfg.BaseURL)
 
-	handler, err := handler.NewRouter(svc)
+	return svc
+}
+
+func setupRouter(t *testing.T, svc *service.ShortenerService) (rtr http.Handler, err error) {
+	t.Helper()
+
+	rtr, err = handler.NewRouter(svc)
 	if err != nil {
-		t.Fatal(err)
+		return nil, err
 	}
 
-	return handler, repo, svc
+	return rtr, nil
 }
 
 func TestPing(t *testing.T) {
@@ -79,16 +97,21 @@ func TestPing(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			router, repo, svc := setupRouter(t)
-			defer repo.Close()
-
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			m := mock.NewMockPinger(ctrl)
-			m.EXPECT().PingContext(gomock.Any()).Return(tt.pingResult)
+			repo := mock_repository.NewMockRepository(ctrl)
+			defer repo.Close()
 
-			svc.AttachDB(m)
+			repo.EXPECT().PingContext(gomock.Any()).Return(tt.pingResult).AnyTimes()
+			repo.EXPECT().Close().Return(nil).AnyTimes()
+
+			svc := setupService(t, repo)
+
+			router, err := setupRouter(t, svc)
+			if err != nil {
+				t.Fatalf("failed to setup router: %v", err)
+			}
 
 			req := httptest.NewRequest(http.MethodGet, "/ping", nil)
 			w := httptest.NewRecorder()
@@ -104,8 +127,18 @@ func TestPing(t *testing.T) {
 }
 
 func TestPOST_Success(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "text/plain")
@@ -124,8 +157,18 @@ func TestPOST_Success(t *testing.T) {
 }
 
 func TestPOST_InvalidContentType(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "application/json")
@@ -139,8 +182,18 @@ func TestPOST_InvalidContentType(t *testing.T) {
 }
 
 func TestPOST_EmptyBody(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	req.Header.Set("Content-Type", "text/plain")
@@ -154,8 +207,18 @@ func TestPOST_EmptyBody(t *testing.T) {
 }
 
 func TestGET_Success(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	_ = repo.Save(model.URL{Short: "xyz", Original: "https://ya.ru"})
 
@@ -171,8 +234,18 @@ func TestGET_Success(t *testing.T) {
 }
 
 func TestShortenURL_Success(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"url":"https://practicum.yandex.ru"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -202,8 +275,18 @@ func TestShortenURL_Success(t *testing.T) {
 }
 
 func TestShortenURL_BadRequest(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/api/shorten", strings.NewReader(`{"bad":"request"}`))
 	req.Header.Set("Content-Type", "application/json")
@@ -220,8 +303,18 @@ func TestShortenURL_BadRequest(t *testing.T) {
 }
 
 func TestGzipRequest_Success(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	var buf strings.Builder
 	gzWriter := gzip.NewWriter(&buf)
@@ -246,8 +339,18 @@ func TestGzipRequest_Success(t *testing.T) {
 }
 
 func TestGzipResponse_Success(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("https://example.com"))
 	req.Header.Set("Content-Type", "text/plain")
@@ -274,8 +377,18 @@ func TestGzipResponse_Success(t *testing.T) {
 }
 
 func TestGET_NotFound(t *testing.T) {
-	router, repo, _ := setupRouter(t)
+	repo, err := setupRepository(t, "inmemory")
+	if err != nil {
+		t.Fatalf("failed to setup repository: %v", err)
+	}
 	defer repo.Close()
+
+	svc := setupService(t, repo)
+
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
 
 	req := httptest.NewRequest(http.MethodGet, "/unknown", nil)
 	w := httptest.NewRecorder()

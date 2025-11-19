@@ -15,7 +15,6 @@ import (
 type ShortenerService struct {
 	repo    repository.Repository
 	baseURL string
-	db      Pinger
 }
 
 func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
@@ -51,24 +50,11 @@ func (s *ShortenerService) Resolve(id string) (string, error) {
 
 }
 
-type Pinger interface {
-	PingContext(ctx context.Context) error
-}
-
 func (s *ShortenerService) PingContext(ctx context.Context) error {
-	if s.db == nil {
-		panic("не задано свойство db")
-	}
 
-	if err := s.db.PingContext(ctx); err != nil {
+	if err := s.repo.PingContext(ctx); err != nil {
 		return err
 	}
-
-	return nil
-}
-
-func (s *ShortenerService) AttachDB(db Pinger) error {
-	s.db = db
 
 	return nil
 }

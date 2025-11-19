@@ -4,8 +4,6 @@ import (
 	"log"
 	"net/http"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
-
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
 	"github.com/avitamin/go-shortener/internal/repository"
