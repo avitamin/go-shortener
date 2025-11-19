@@ -23,8 +23,8 @@ var (
 func init() {
 	flag.StringVar(&addr, "a", "localhost:8080", "адрес сервера (например localhost:8080)")
 	flag.StringVar(&base, "b", "http://localhost:8080", "базовый URL (например http://localhost:8080)")
-	flag.StringVar(&filePath, "f", "", "путь к файлу хранилища (например ./runtime/storage)")
-	flag.StringVar(&databaseDsn, "d", "", "путь к файлу хранилища (например postgres://postgres:postgres@db:5432/postgres)")
+	flag.StringVar(&filePath, "f", "./runtime/storage", "путь к файлу хранилища (например ./runtime/storage)")
+	flag.StringVar(&databaseDsn, "d", "", "DSN (например postgres://postgres:postgres@db:5432/postgres)")
 }
 
 func New(withParse bool) (*Config, error) {
