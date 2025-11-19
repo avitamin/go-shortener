@@ -48,11 +48,12 @@ func setupRepository(t *testing.T, repoType string) (repo repository.Repository,
 		tmpFilePath := filepath.Join(tmpDir, "test_storage.json")
 		cfg.FileStoragePath = tmpFilePath
 
-	}
-
-	repo, err = repository.New(cfg)
-	if err != nil {
-		return nil, err
+		repo, err = repository.NewFileStorageRepository(cfg.FileStoragePath)
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+		repo = repository.NewInMemoryStorage()
 	}
 
 	return repo, nil
