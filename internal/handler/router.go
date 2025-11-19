@@ -130,7 +130,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		defer cancel()
 
 		if err := service.PingContext(ctx); err != nil {
-
+			log.Error(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}

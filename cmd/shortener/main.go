@@ -1,8 +1,11 @@
 package main
 
 import (
+	"database/sql"
 	"log"
 	"net/http"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
@@ -16,10 +19,28 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	var repo repository.Repository
 
-	repo, err := repository.New(cfg)
-	if err != nil {
-		log.Fatal(err)
+	if cfg.DatabaseDsn != "" {
+		db, err := sql.Open("pgx", cfg.DatabaseDsn)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer db.Close()
+
+		repo, err = repository.NewDataBaseRepository(db)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	} else if cfg.FileStoragePath != "" {
+		repo, err = repository.NewFileStorageRepository(cfg.FileStoragePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+	} else {
+		repo = repository.NewInMemoryStorage()
 	}
 	defer repo.Close()
 

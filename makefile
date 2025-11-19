@@ -34,6 +34,9 @@ logs:
 psql:
 	@docker exec -it postgres_db psql -U postgres -d postgres
 
+go-run:
+	@go run ./cmd/shortener/main.go -a=localhost:8099 -b=http://localhost:8099/ -d=postgres://postgres:postgres@localhost:54323/shortener?sslmode=disable
+
 ## 🧾 Справка по доступным командам
 help:
 	@echo ""
