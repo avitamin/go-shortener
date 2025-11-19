@@ -7,6 +7,10 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -27,6 +31,18 @@ func main() {
 			log.Fatal(err)
 		}
 		defer db.Close()
+
+		driver, err := postgres.WithInstance(db, &postgres.Config{})
+		if err != nil {
+			log.Fatal(err)
+		}
+		m, err := migrate.NewWithDatabaseInstance(
+			"file://migrations",
+			"postgres", driver)
+		if err != nil {
+			log.Fatal(err)
+		}
+		m.Up()
 
 		repo, err = repository.NewDataBaseRepository(db)
 		if err != nil {
