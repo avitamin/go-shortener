@@ -33,7 +33,11 @@ func (s *ShortenerService) Shorten(orig string) (string, error) {
 		return "", err
 	}
 
-	return s.baseURL + "/" + short, nil
+	return s.GetAbsoluteShortURL(short), nil
+}
+
+func (s *ShortenerService) GetAbsoluteShortURL(short string) string {
+	return s.baseURL + "/" + short
 }
 
 func (s *ShortenerService) createModel(orig string) (string, model.URL) {
@@ -77,7 +81,11 @@ func (s *ShortenerService) PingContext(ctx context.Context) error {
 }
 
 func (s *ShortenerService) GetShort(orig string) (string, bool) {
-	return s.repo.GetShort(orig)
+	short, ok := s.repo.GetShort(orig)
+	if ok {
+		return s.GetAbsoluteShortURL(short), true
+	}
+	return "", false
 }
 
 func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string) ([]string, error) {
