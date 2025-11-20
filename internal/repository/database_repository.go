@@ -46,6 +46,48 @@ func (r *DataBaseRepository) Save(url model.URL) error {
 
 }
 
+func (r *DataBaseRepository) SaveBatch(ctx context.Context, urls []model.URL) error {
+	if len(urls) == 0 {
+		return nil
+	}
+
+	// Блокируем in-memory storage на время операции, чтобы избежать гонок между
+	// локальной памятью и записью в БД.
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// Подготавливаем statement для вставки
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO urls (short, original) VALUES ($1, $2)")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+
+	for _, u := range urls {
+		if _, err := stmt.ExecContext(ctx, u.Short, u.Original); err != nil {
+			tx.Rollback()
+			return err
+		}
+		// Записываем в in-memory storage
+		if err := r.storage.Save(u); err != nil {
+			tx.Rollback()
+			return err
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (r *DataBaseRepository) Close() error {
 	return nil
 }

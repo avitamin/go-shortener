@@ -13,3 +13,13 @@ type ShortenRequest struct {
 type ShortenResponse struct {
 	Result string `json:"result"`
 }
+
+type BatchShortRequest struct {
+	CorrelationID string `json:"correlation_id"`
+	Original      string `json:"original_url"`
+}
+
+type BatchShortenResponse struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+}

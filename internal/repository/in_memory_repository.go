@@ -36,10 +36,40 @@ func (r *inMemoryStorage) Save(url model.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	return r.saveNoLock(url)
+}
+
+func (r *inMemoryStorage) saveNoLock(url model.URL) error {
 	r.data[url.Short] = url.Original
 
 	return nil
+}
 
+func (r *inMemoryStorage) SaveBatch(ctx context.Context, urls []model.URL) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	err := r.SaveBatchNoLock(ctx, urls)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *inMemoryStorage) SaveBatchNoLock(ctx context.Context, urls []model.URL) error {
+	for _, u := range urls {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			if err := r.saveNoLock(u); err != nil {
+				return err
+			}
+		}
+
+	}
+	return nil
 }
 
 func (r *inMemoryStorage) Close() error {
@@ -48,4 +78,19 @@ func (r *inMemoryStorage) Close() error {
 
 func (r *inMemoryStorage) PingContext(ctx context.Context) error {
 	return errors.New("db not configured")
+}
+
+func (r *inMemoryStorage) GetAll() []model.URL {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	result := make([]model.URL, 0, len(r.data))
+	for short, orig := range r.data {
+		result = append(result, model.URL{
+			Short:    short,
+			Original: orig,
+		})
+	}
+	return result
+
 }

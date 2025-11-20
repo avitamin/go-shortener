@@ -1,81 +1,146 @@
 package service_test
 
 import (
-	"context"
 	"errors"
 	"testing"
 
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
+	mock_repository "github.com/avitamin/go-shortener/internal/repository/mock"
 	"github.com/avitamin/go-shortener/internal/service"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
 
-// mock repository for isolation
-type mockRepo struct {
-	data map[string]string
-}
-
-func newMockRepo() *mockRepo {
-	return &mockRepo{data: make(map[string]string)}
-}
-
-func (m *mockRepo) Save(url model.URL) error {
-	m.data[url.Short] = url.Original
-	return nil
-}
-
-func (m *mockRepo) Find(id string) (model.URL, error) {
-	val, ok := m.data[id]
-	if !ok {
-		return model.URL{}, repository.ErrNotFound
+func TestShorterenerService(t *testing.T) {
+	tests := []struct {
+		name               string
+		baseURL            string
+		originalURL        string
+		invalidOriginalURL string
+		shortURL           string
+		wrongShortURL      string
+		testShorten        bool
+		wantShortenError   bool
+		testResolve        bool
+		wantResolveError   bool
+		wantResolveErrorIs error
+		wantResolvedUrl    string
+		wantEmptyShortUrl  bool
+	}{
+		{
+			name:              "shorten success",
+			testShorten:       true,
+			testResolve:       false,
+			baseURL:           "http://localhost:8080",
+			originalURL:       "https://yandex.ru",
+			shortURL:          "http://localhost:8080/short",
+			wantShortenError:  false,
+			wantResolveError:  false,
+			wantEmptyShortUrl: false,
+		},
+		{
+			name:               "shorten with invalid URL",
+			testResolve:        true,
+			testShorten:        false,
+			baseURL:            "http://localhost:8080",
+			invalidOriginalURL: "yandex.ru",
+			shortURL:           "http://localhost:8080/short",
+			wantShortenError:   true,
+			wantResolveError:   false,
+			wantEmptyShortUrl:  true,
+		},
+		{
+			name:              "resolve success",
+			testShorten:       false,
+			testResolve:       true,
+			baseURL:           "http://localhost:8080",
+			originalURL:       "https://yandex.ru",
+			shortURL:          "short",
+			wantShortenError:  false,
+			wantResolveError:  false,
+			wantResolvedUrl:   "https://yandex.ru",
+			wantEmptyShortUrl: false,
+		},
+		{
+			name:               "resolve not found",
+			testShorten:        false,
+			testResolve:        true,
+			baseURL:            "http://localhost:8080",
+			originalURL:        "https://yandex.ru",
+			wrongShortURL:      "wrong url",
+			wantShortenError:   false,
+			wantResolveError:   true,
+			wantResolveErrorIs: repository.ErrNotFound,
+			wantEmptyShortUrl:  false,
+		},
 	}
-	return model.URL{Short: id, Original: val}, nil
-}
 
-func (m *mockRepo) Close() error {
-	return nil
-}
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
 
-func (m *mockRepo) PingContext(ctx context.Context) error {
-	return errors.New("db not found")
-}
+	repo := mock_repository.NewMockRepository(ctrl)
+	defer repo.Close()
 
-func TestShorten_Success(t *testing.T) {
-	repo := newMockRepo()
-	svc := service.NewShortenerService(repo, "http://localhost:8080")
+	repo.EXPECT().Close().Return(nil).AnyTimes()
 
-	shortURL, err := svc.Shorten("https://yandex.ru")
-	assert.NoError(t, err)
-	assert.Contains(t, shortURL, "http://localhost:8080/")
-	assert.Len(t, repo.data, 1)
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc := service.NewShortenerService(repo, tt.baseURL)
 
-func TestShorten_InvalidURL(t *testing.T) {
-	repo := newMockRepo()
-	svc := service.NewShortenerService(repo, "http://localhost:8080")
+			if tt.testShorten {
+				if tt.invalidOriginalURL != "" {
+					repo.EXPECT().Save(gomock.Any()).Return(errors.New("некорректный url")).AnyTimes()
+				} else {
+					repo.EXPECT().Save(gomock.Any()).Return(nil).AnyTimes()
+				}
 
-	shortURL, err := svc.Shorten("yandex.ru")
-	assert.Error(t, err)
-	assert.Empty(t, shortURL)
-}
+				shortURL, err := svc.Shorten(tt.originalURL)
+				if tt.wantShortenError {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
 
-func TestResolve_Success(t *testing.T) {
-	repo := newMockRepo()
-	svc := service.NewShortenerService(repo, "http://localhost:8080")
+				if tt.wantEmptyShortUrl {
+					assert.Empty(t, shortURL)
+				} else {
+					assert.NotEmpty(t, shortURL)
 
-	url := model.URL{Short: "abc123", Original: "https://ya.ru"}
-	_ = repo.Save(url)
+					assert.Contains(t, shortURL, tt.baseURL)
+				}
+			}
 
-	result, err := svc.Resolve("abc123")
-	assert.NoError(t, err)
-	assert.Equal(t, "https://ya.ru", result)
-}
+			if tt.testResolve {
+				var shortURL string
+				if tt.wrongShortURL != "" {
+					shortURL = tt.wrongShortURL
+					repo.EXPECT().Find(tt.wrongShortURL).Return(model.URL{}, repository.ErrNotFound).AnyTimes()
+				} else {
+					shortURL = tt.shortURL
+				}
 
-func TestResolve_NotFound(t *testing.T) {
-	repo := newMockRepo()
-	svc := service.NewShortenerService(repo, "http://localhost:8080")
+				if tt.shortURL != "" {
+					repo.EXPECT().Find(tt.shortURL).Return(model.URL{Short: tt.shortURL, Original: tt.originalURL}, nil).AnyTimes()
+				}
 
-	_, err := svc.Resolve("notfound")
-	assert.ErrorIs(t, err, repository.ErrNotFound)
+				result, err := svc.Resolve(shortURL)
+
+				if tt.wantResolveError {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+				}
+
+				if tt.wantResolveErrorIs != nil {
+					assert.ErrorIs(t, err, tt.wantResolveErrorIs)
+				}
+
+				if tt.wantResolvedUrl != "" {
+					assert.Equal(t, tt.wantResolvedUrl, result)
+				}
+			}
+		})
+	}
+
 }

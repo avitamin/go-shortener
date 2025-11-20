@@ -54,9 +54,8 @@ func (r *fileStorageRepositoy) Save(url model.URL) error {
 		return err
 	}
 
-	url.UUID = uuid.New().String()
-
-	if err := r.encoder.Encode(url); err != nil {
+	err := r.writeUrl(url)
+	if err != nil {
 		return err
 	}
 
@@ -66,6 +65,52 @@ func (r *fileStorageRepositoy) Save(url model.URL) error {
 
 	return r.file.Sync()
 
+}
+
+func (r *fileStorageRepositoy) writeUrl(url model.URL) error {
+	url.UUID = uuid.New().String()
+
+	if err := r.encoder.Encode(url); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *fileStorageRepositoy) SaveBatch(ctx context.Context, urls []model.URL) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Сначала сохраняем в in-memory (без race)
+	if err := r.storage.SaveBatchNoLock(ctx, urls); err != nil {
+		return err
+	}
+
+	// Теперь пишем в файл все URL как одну транзакцию
+	for _, u := range urls {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			u.UUID = uuid.New().String()
+
+			if err := r.encoder.Encode(u); err != nil {
+				return err
+			}
+		}
+	}
+
+	// Сбрасываем буфер
+	if err := r.writer.Flush(); err != nil {
+		return err
+	}
+
+	// Фиксируем транзакцию в файле
+	if err := r.file.Sync(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (r *fileStorageRepositoy) PingContext(ctx context.Context) error {

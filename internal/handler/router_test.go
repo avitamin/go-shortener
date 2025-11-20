@@ -400,3 +400,78 @@ func TestGET_NotFound(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+func TestShortenBatch_Success(t *testing.T) {
+	repo := repository.NewInMemoryStorage()
+	svc := setupService(t, repo)
+	router, err := setupRouter(t, svc)
+	if err != nil {
+		t.Fatalf("failed to setup router: %v", err)
+	}
+
+	payload := []model.BatchShortRequest{
+		{CorrelationID: "1", Original: "https://a.example"},
+		{CorrelationID: "2", Original: "https://b.example"},
+		{CorrelationID: "3", Original: "https://a.example"}, // duplicate original -> same short
+	}
+
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(string(b)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	respBody, _ := io.ReadAll(resp.Body)
+	var got []model.BatchShortenResponse
+	json.Unmarshal(respBody, &got)
+
+	assert.Equal(t, len(payload), len(got))
+	// Проверим, что первые и третий short совпадают
+	assert.Equal(t, got[0].ShortURL, got[2].ShortURL)
+	// correlation ids preserved
+	assert.Equal(t, "1", got[0].CorrelationID)
+	assert.Equal(t, "2", got[1].CorrelationID)
+	assert.Equal(t, "3", got[2].CorrelationID)
+}
+
+func TestShortenBatch_EmptyArray(t *testing.T) {
+	repo := repository.NewInMemoryStorage()
+	svc := setupService(t, repo)
+	router, _ := setupRouter(t, svc)
+
+	b := []byte("[]")
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(string(b)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestShortenBatch_ElementInvalid(t *testing.T) {
+	repo := repository.NewInMemoryStorage()
+	svc := setupService(t, repo)
+	router, _ := setupRouter(t, svc)
+
+	payload := []model.BatchShortRequest{
+		{CorrelationID: "1", Original: ""},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPost, "/api/shorten/batch", strings.NewReader(string(b)))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, req)
+	resp := w.Result()
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}

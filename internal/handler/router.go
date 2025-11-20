@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/avitamin/go-shortener/internal/logger"
@@ -121,6 +122,86 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 
+		w.Write(respBytes)
+	})
+
+	rtr.Post("/api/shorten/batch", func(w http.ResponseWriter, r *http.Request) {
+		var req []model.BatchShortRequest
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil || len(body) == 0 {
+			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		if err := json.Unmarshal(body, &req); err != nil {
+			log.Error(err.Error())
+			http.Error(w, "Некорректный JSON", http.StatusBadRequest)
+			return
+		}
+
+		// не отправляем пустые батчи
+		if len(req) == 0 {
+			http.Error(w, "Пустой массив", http.StatusBadRequest)
+			return
+		}
+
+		// лимит 1000
+		if len(req) > 1000 {
+			http.Error(w, "Слишком большой батч", http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		// Валидация: каждый original непустой
+		for _, it := range req {
+			if strings.TrimSpace(it.Original) == "" {
+				log.Error("Пустой original_url в батче, correlation_id: " + it.CorrelationID)
+				http.Error(w, "Некорректный элемент в батче", http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Собираем оригиналы в порядке запроса
+		originals := make([]string, 0, len(req))
+		for _, it := range req {
+			originals = append(originals, it.Original)
+		}
+
+		// Контекст с таймаутом 30s
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		shorts, err := service.ShortenBatch(ctx, originals)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		// Формируем ответ — соответствие correlation_id -> short_url
+		resp := make([]model.BatchShortenResponse, 0, len(req))
+		for i, it := range req {
+			resp = append(resp, model.BatchShortenResponse{
+				CorrelationID: it.CorrelationID,
+				ShortURL:      shorts[i],
+			})
+		}
+
+		respBytes, err := json.Marshal(resp)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
 		w.Write(respBytes)
 	})
 
