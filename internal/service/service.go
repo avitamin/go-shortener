@@ -76,6 +76,10 @@ func (s *ShortenerService) PingContext(ctx context.Context) error {
 	return nil
 }
 
+func (s *ShortenerService) GetShort(orig string) (string, bool) {
+	return s.repo.GetShort(orig)
+}
+
 func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string) ([]string, error) {
 	if len(originals) == 0 {
 		return nil, errors.New("empty batch")

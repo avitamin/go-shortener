@@ -40,23 +40,30 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			return
 		}
 
+		var statusCode int
+
 		body, err := io.ReadAll(r.Body)
 
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
 		}
-
 		defer r.Body.Close()
 
-		short, err := service.Shorten(string(body))
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		orig := strings.TrimSpace(string(body))
+		short, ok := service.GetShort(orig)
+		if ok {
+			statusCode = http.StatusConflict
+		} else {
+			statusCode = http.StatusCreated
+			short, err = service.Shorten(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(statusCode)
 
 		w.Write([]byte(short))
 	})
@@ -86,6 +93,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 
 	rtr.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
 		var req model.ShortenRequest
+		var statusCode int
 
 		if r.Header.Get("Content-Type") != "application/json" {
 			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
@@ -97,7 +105,6 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
 		}
-
 		defer r.Body.Close()
 
 		if err := json.Unmarshal(body, &req); err != nil {
@@ -105,12 +112,19 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			return
 		}
 
-		short, err := service.Shorten(req.URL)
-
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+		orig := strings.TrimSpace(req.URL)
+		short, ok := service.GetShort(orig)
+		if ok {
+			statusCode = http.StatusConflict
+		} else {
+			statusCode = http.StatusCreated
+			short, err = service.Shorten(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 		}
+
 		resp := model.ShortenResponse{Result: short}
 		respBytes, err := json.Marshal(resp)
 		if err != nil {
@@ -120,7 +134,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(statusCode)
 
 		w.Write(respBytes)
 	})
