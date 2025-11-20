@@ -58,7 +58,7 @@ func (r *fileStorageRepositoy) Save(url model.URL) error {
 		return err
 	}
 
-	err := r.writeUrl(url)
+	err := r.writeURL(url)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (r *fileStorageRepositoy) Save(url model.URL) error {
 
 }
 
-func (r *fileStorageRepositoy) writeUrl(url model.URL) error {
+func (r *fileStorageRepositoy) writeURL(url model.URL) error {
 	url.UUID = uuid.New().String()
 
 	if err := r.encoder.Encode(url); err != nil {

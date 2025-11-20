@@ -25,8 +25,8 @@ func TestShorterenerService(t *testing.T) {
 		testResolve        bool
 		wantResolveError   bool
 		wantResolveErrorIs error
-		wantResolvedUrl    string
-		wantEmptyShortUrl  bool
+		wantResolvedURL    string
+		wantEmptyShortURL  bool
 	}{
 		{
 			name:              "shorten success",
@@ -37,7 +37,7 @@ func TestShorterenerService(t *testing.T) {
 			shortURL:          "http://localhost:8080/short",
 			wantShortenError:  false,
 			wantResolveError:  false,
-			wantEmptyShortUrl: false,
+			wantEmptyShortURL: false,
 		},
 		{
 			name:               "shorten with invalid URL",
@@ -48,7 +48,7 @@ func TestShorterenerService(t *testing.T) {
 			shortURL:           "http://localhost:8080/short",
 			wantShortenError:   true,
 			wantResolveError:   false,
-			wantEmptyShortUrl:  true,
+			wantEmptyShortURL:  true,
 		},
 		{
 			name:              "resolve success",
@@ -59,8 +59,8 @@ func TestShorterenerService(t *testing.T) {
 			shortURL:          "short",
 			wantShortenError:  false,
 			wantResolveError:  false,
-			wantResolvedUrl:   "https://yandex.ru",
-			wantEmptyShortUrl: false,
+			wantResolvedURL:   "https://yandex.ru",
+			wantEmptyShortURL: false,
 		},
 		{
 			name:               "resolve not found",
@@ -72,7 +72,7 @@ func TestShorterenerService(t *testing.T) {
 			wantShortenError:   false,
 			wantResolveError:   true,
 			wantResolveErrorIs: repository.ErrNotFound,
-			wantEmptyShortUrl:  false,
+			wantEmptyShortURL:  false,
 		},
 	}
 
@@ -102,7 +102,7 @@ func TestShorterenerService(t *testing.T) {
 					assert.NoError(t, err)
 				}
 
-				if tt.wantEmptyShortUrl {
+				if tt.wantEmptyShortURL {
 					assert.Empty(t, shortURL)
 				} else {
 					assert.NotEmpty(t, shortURL)
@@ -136,8 +136,8 @@ func TestShorterenerService(t *testing.T) {
 					assert.ErrorIs(t, err, tt.wantResolveErrorIs)
 				}
 
-				if tt.wantResolvedUrl != "" {
-					assert.Equal(t, tt.wantResolvedUrl, result)
+				if tt.wantResolvedURL != "" {
+					assert.Equal(t, tt.wantResolvedURL, result)
 				}
 			}
 		})
