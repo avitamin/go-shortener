@@ -27,8 +27,12 @@ func NewDataBaseRepository(db *sql.DB) (Repository, error) {
 	return r, nil
 }
 
-func (r *DataBaseRepository) Find(id string) (model.URL, error) {
-	return r.storage.Find(id)
+func (r *DataBaseRepository) Find(short string) (model.URL, error) {
+	return r.storage.Find(short)
+}
+
+func (r *DataBaseRepository) GetShort(orig string) (short string, ok bool) {
+	return r.storage.GetShort(orig)
 }
 
 func (r *DataBaseRepository) Save(url model.URL) error {

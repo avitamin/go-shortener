@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"strings"
-	"sync"
 
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -23,21 +22,38 @@ func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerS
 }
 
 func (s *ShortenerService) Shorten(orig string) (string, error) {
-	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
-		return "", errors.New("некорректный url")
+	err := s.validateOriginalUrl(orig)
+	if err != nil {
+		return "", err
 	}
 
-	id := generateID()
-	url := model.URL{
-		Short:    id,
-		Original: orig,
-	}
+	short, url := s.createModel(orig)
 
 	if err := s.repo.Save(url); err != nil {
 		return "", err
 	}
 
-	return s.baseURL + "/" + id, nil
+	return s.baseURL + "/" + short, nil
+}
+
+func (s *ShortenerService) createModel(orig string) (string, model.URL) {
+	short := generateID()
+
+	model := model.URL{
+		Short:    short,
+		Original: orig,
+	}
+
+	return short, model
+}
+
+func (s *ShortenerService) validateOriginalUrl(orig string) error {
+
+	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
+		return errors.New("некорректный url")
+	}
+
+	return nil
 }
 
 func (s *ShortenerService) Resolve(id string) (string, error) {
@@ -79,60 +95,20 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 			indices[i] = idx
 		}
 	}
-
-	// Для каждого уникального оригинала получаем/генерируем короткий URL.
-	// Чтобы избежать race condition при параллельных вызовах, будем генерировать
-	// и сохранять результаты через repo.SaveBatch (одно действие).
-	// Здесь можно параллелить локально генерацию short-ключа, но сохранение делаем одним запросом.
-
 	shortForUnique := make([]string, len(uniques))
-	// Используем мьютекс + WaitGroup для параллельной генерации short (генерация сама по себе
-	// должна быть потокобезопасной; если сервис.Shorten использует репозиторий — осторожно,
-	// поэтому лучше реализовать генерацию локально через существующий s.Shorten для каждого уникального).
-	var wg sync.WaitGroup
-	var genErr error
-	var genErrMu sync.Mutex
 
-	for i, u := range uniques {
-		wg.Add(1)
-		go func(idx int, orig string) {
-			defer wg.Done()
-			// Можно использовать существующий Shorten, но он, возможно, уже делает запись.
-			// Чтобы избежать ранней записи по одному, предполагаем, что Shorten без записи возвращает ключ,
-			// но в нашем случае проще — использовать existing repo check + generation here.
-
-			// Попробуем найти существующий короткий URL в памяти (repo may have an index),
-			// но интерфейс не имеет FindByOriginal — поэтому дергаем s.Shorten(orig),
-			// а затем будем собрать все model.URL и вызвать SaveBatch — SaveBatch внутри
-			// должен корректно обработать дубликаты (например, при двойной вставке вернуть ошибку уникальности).
-			short, err := s.Shorten(orig)
-			if err != nil {
-				genErrMu.Lock()
-				if genErr == nil {
-					genErr = err
-				}
-				genErrMu.Unlock()
-				return
-			}
-			shortForUnique[idx] = short
-		}(i, u)
-	}
-
-	wg.Wait()
-	if genErr != nil {
-		return nil, genErr
-	}
-
-	// Подготовим объекты model.URL для сохранения (один URL-пара для каждого уникального original).
-	// Shorten уже добавил (возможно) записи в репозиторий, но чтобы гарантировать атомарность и
-	// требование "сохранить все записи" — сделаем SaveBatch. SaveBatch должен корректно обработать
-	// случаев когда запись уже существует (например, уникальные constraint в БД).
 	urlsToSave := make([]model.URL, 0, len(uniques))
 	for i, orig := range uniques {
-		urlsToSave = append(urlsToSave, model.URL{
-			Short:    shortForUnique[i],
-			Original: orig,
-		})
+		short, ok := s.repo.GetShort(orig)
+		if ok {
+			shortForUnique[i] = short
+			continue
+		}
+
+		short, model := s.createModel(orig)
+		shortForUnique[i] = short
+
+		urlsToSave = append(urlsToSave, model)
 	}
 
 	if err := s.repo.SaveBatch(ctx, urlsToSave); err != nil {
@@ -142,7 +118,7 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 	// Восстанавливаем массив short'ов в исходном порядке
 	result := make([]string, len(originals))
 	for i, idx := range indices {
-		// Склеиваем baseURL + shortForUnique[idx]
+
 		result[i] = s.baseURL + "/" + shortForUnique[idx]
 	}
 

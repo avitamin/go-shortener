@@ -64,6 +64,21 @@ func (mr *MockRepositoryMockRecorder) Find(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Find", reflect.TypeOf((*MockRepository)(nil).Find), arg0)
 }
 
+// GetShort mocks base method.
+func (m *MockRepository) GetShort(arg0 string) (string, bool) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetShort", arg0)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(bool)
+	return ret0, ret1
+}
+
+// GetShort indicates an expected call of GetShort.
+func (mr *MockRepositoryMockRecorder) GetShort(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShort", reflect.TypeOf((*MockRepository)(nil).GetShort), arg0)
+}
+
 // PingContext mocks base method.
 func (m *MockRepository) PingContext(arg0 context.Context) error {
 	m.ctrl.T.Helper()

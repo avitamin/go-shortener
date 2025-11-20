@@ -3,33 +3,35 @@ package repository
 import (
 	"context"
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/avitamin/go-shortener/internal/model"
 )
 
 type inMemoryStorage struct {
-	mu   sync.Mutex
-	data map[string]string
+	mu          sync.Mutex
+	origByShort map[string]string
+	shortByOrig map[string]string
 }
 
 func NewInMemoryStorage() *inMemoryStorage {
 	return &inMemoryStorage{
-		data: make(map[string]string),
+		origByShort: make(map[string]string),
+		shortByOrig: make(map[string]string),
 	}
 }
 
-func (r *inMemoryStorage) Find(id string) (model.URL, error) {
+func (r *inMemoryStorage) Find(short string) (model.URL, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	orig, ok := r.data[id]
-
+	orig, ok := r.origByShort[short]
 	if !ok {
 		return model.URL{}, ErrNotFound
 	}
 
-	return model.URL{Short: id, Original: orig}, nil
+	return model.URL{Short: short, Original: orig}, nil
 }
 
 func (r *inMemoryStorage) Save(url model.URL) error {
@@ -39,8 +41,23 @@ func (r *inMemoryStorage) Save(url model.URL) error {
 	return r.saveNoLock(url)
 }
 
+func (r *inMemoryStorage) GetShort(orig string) (short string, ok bool) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	short, ok = r.shortByOrig[orig]
+	if ok {
+		log.Println("найдена запись ", orig, "->", short)
+		return short, true
+	}
+
+	return "", false
+}
+
 func (r *inMemoryStorage) saveNoLock(url model.URL) error {
-	r.data[url.Short] = url.Original
+	r.origByShort[url.Short] = url.Original
+	r.shortByOrig[url.Original] = url.Short
+	log.Println("Saved URL:", url.Short, "->", url.Original)
 
 	return nil
 }
@@ -84,8 +101,8 @@ func (r *inMemoryStorage) GetAll() []model.URL {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	result := make([]model.URL, 0, len(r.data))
-	for short, orig := range r.data {
+	result := make([]model.URL, 0, len(r.origByShort))
+	for short, orig := range r.origByShort {
 		result = append(result, model.URL{
 			Short:    short,
 			Original: orig,
