@@ -250,12 +250,12 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	return rtr, nil
 }
 
-var invalidURLErr = errors.New("некорректный url")
+var ErrInvalidURL = errors.New("некорректный url")
 
 func validateOriginalURL(orig string) error {
 
 	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
-		return invalidURLErr
+		return ErrInvalidURL
 	}
 
 	return nil
