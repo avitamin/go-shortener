@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -37,23 +41,37 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			return
 		}
 
+		var statusCode int
+
 		body, err := io.ReadAll(r.Body)
 
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
 		}
-
 		defer r.Body.Close()
 
-		short, err := service.Shorten(string(body))
+		orig := strings.TrimSpace(string(body))
+		short, ok := service.GetShort(orig)
+		if ok {
+			statusCode = http.StatusConflict
+		} else {
+			err := validateOriginalURL(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			statusCode = http.StatusCreated
+
+			short, err = service.Shorten(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
 
 		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusCreated)
+		w.WriteHeader(statusCode)
 
 		w.Write([]byte(short))
 	})
@@ -73,7 +91,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			}
 
 			log.Error(err.Error())
-			http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
@@ -83,6 +101,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 
 	rtr.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
 		var req model.ShortenRequest
+		var statusCode int
 
 		if r.Header.Get("Content-Type") != "application/json" {
 			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
@@ -94,7 +113,6 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		if err != nil || len(body) == 0 {
 			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
 		}
-
 		defer r.Body.Close()
 
 		if err := json.Unmarshal(body, &req); err != nil {
@@ -102,25 +120,143 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			return
 		}
 
-		short, err := service.Shorten(req.URL)
+		orig := strings.TrimSpace(req.URL)
+		short, ok := service.GetShort(orig)
+		if ok {
+			statusCode = http.StatusConflict
+		} else {
+			err := validateOriginalURL(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusBadRequest)
-			return
+			statusCode = http.StatusCreated
+			short, err = service.Shorten(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 		}
+
 		resp := model.ShortenResponse{Result: short}
 		respBytes, err := json.Marshal(resp)
 		if err != nil {
 			log.Error(err.Error())
-			http.Error(w, "внутренняя ошибка", http.StatusInternalServerError)
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(statusCode)
+
+		w.Write(respBytes)
+	})
+
+	rtr.Post("/api/shorten/batch", func(w http.ResponseWriter, r *http.Request) {
+		var req []model.BatchShortRequest
+
+		if r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
+			return
+		}
+
+		body, err := io.ReadAll(r.Body)
+		if err != nil || len(body) == 0 {
+			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		if err := json.Unmarshal(body, &req); err != nil {
+			log.Error(err.Error())
+			http.Error(w, "Некорректный JSON", http.StatusBadRequest)
+			return
+		}
+
+		// не отправляем пустые батчи
+		if len(req) == 0 {
+			http.Error(w, "Пустой массив", http.StatusBadRequest)
+			return
+		}
+
+		// лимит 1000
+		if len(req) > 1000 {
+			http.Error(w, "Слишком большой батч", http.StatusRequestEntityTooLarge)
+			return
+		}
+
+		// Валидация: каждый original непустой
+		for _, it := range req {
+			if strings.TrimSpace(it.Original) == "" {
+				log.Error("Пустой original_url в батче, correlation_id: " + it.CorrelationID)
+				http.Error(w, "Некорректный элемент в батче", http.StatusBadRequest)
+				return
+			}
+		}
+
+		// Собираем оригиналы в порядке запроса
+		originals := make([]string, 0, len(req))
+		for _, it := range req {
+			originals = append(originals, it.Original)
+		}
+
+		// Контекст с таймаутом 30s
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		shorts, err := service.ShortenBatch(ctx, originals)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		// Формируем ответ — соответствие correlation_id -> short_url
+		resp := make([]model.BatchShortenResponse, 0, len(req))
+		for i, it := range req {
+			resp = append(resp, model.BatchShortenResponse{
+				CorrelationID: it.CorrelationID,
+				ShortURL:      shorts[i],
+			})
+		}
+
+		respBytes, err := json.Marshal(resp)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
-
 		w.Write(respBytes)
 	})
 
+	rtr.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
+
+		ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
+		defer cancel()
+
+		if err := service.PingContext(ctx); err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+	})
+
 	return rtr, nil
+}
+
+var ErrInvalidURL = errors.New("некорректный url")
+
+func validateOriginalURL(orig string) error {
+
+	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
+		return ErrInvalidURL
+	}
+
+	return nil
 }
