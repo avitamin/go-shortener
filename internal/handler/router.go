@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -54,10 +55,17 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		if ok {
 			statusCode = http.StatusConflict
 		} else {
-			statusCode = http.StatusCreated
-			short, err = service.Shorten(orig)
+			err := validateOriginalURL(orig)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
+			statusCode = http.StatusCreated
+
+			short, err = service.Shorten(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -117,10 +125,16 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		if ok {
 			statusCode = http.StatusConflict
 		} else {
+			err := validateOriginalURL(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
+
 			statusCode = http.StatusCreated
 			short, err = service.Shorten(orig)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -234,4 +248,15 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	})
 
 	return rtr, nil
+}
+
+var invalidUrlErr = errors.New("некорректный url")
+
+func validateOriginalURL(orig string) error {
+
+	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
+		return invalidUrlErr
+	}
+
+	return nil
 }

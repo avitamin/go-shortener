@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"strings"
 
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -22,10 +21,6 @@ func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerS
 }
 
 func (s *ShortenerService) Shorten(orig string) (string, error) {
-	err := s.validateOriginalURL(orig)
-	if err != nil {
-		return "", err
-	}
 
 	short, url := s.createModel(orig)
 
@@ -49,15 +44,6 @@ func (s *ShortenerService) createModel(orig string) (string, model.URL) {
 	}
 
 	return short, model
-}
-
-func (s *ShortenerService) validateOriginalURL(orig string) error {
-
-	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
-		return errors.New("некорректный url")
-	}
-
-	return nil
 }
 
 func (s *ShortenerService) Resolve(id string) (string, error) {
