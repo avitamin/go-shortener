@@ -21,38 +21,38 @@ func main() {
 
 	cfg, err := config.New(true)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("configuration creating error: %v", err)
 	}
 	var repo repository.Repository
 
 	if cfg.DatabaseDsn != "" {
 		db, err := sql.Open("pgx", cfg.DatabaseDsn)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("database connection opening error: %v", err)
 		}
 		defer db.Close()
 
 		driver, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("database driver creating error: %v", err)
 		}
 		m, err := migrate.NewWithDatabaseInstance(
 			"file://migrations",
 			"postgres", driver)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("migrations applying error: %v", err)
 		}
 		m.Up()
 
 		repo, err = repository.NewDataBaseRepository(db)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("repository creating error: %v", err)
 		}
 
 	} else if cfg.FileStoragePath != "" {
 		repo, err = repository.NewFileStorageRepository(cfg.FileStoragePath)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("repository creating error: %v", err)
 		}
 
 	} else {
@@ -64,12 +64,12 @@ func main() {
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("router creating error: %v", err)
 	}
 
 	log.Printf("Запускаем сервер по адресу %s\n", cfg.Address)
 
 	if err := http.ListenAndServe(cfg.Address, rtr); err != nil {
-		log.Fatal(err)
+		log.Fatalf("server launching error: %v", err)
 	}
 }
