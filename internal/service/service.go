@@ -11,6 +11,8 @@ import (
 	"github.com/avitamin/go-shortener/internal/repository"
 )
 
+var ErrNoUserIDInContext = errors.New("no user ID in context")
+
 type ShortenerService struct {
 	repo    repository.Repository
 	baseURL string
@@ -20,9 +22,9 @@ func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerS
 	return &ShortenerService{repo: repo, baseURL: baseURL}
 }
 
-func (s *ShortenerService) Shorten(orig string) (string, error) {
+func (s *ShortenerService) Shorten(ctx context.Context, orig string) (string, error) {
 
-	short, url := s.createModel(orig)
+	short, url := s.createModel(ctx, orig)
 
 	if err := s.repo.Save(url); err != nil {
 		return "", err
@@ -35,12 +37,18 @@ func (s *ShortenerService) GetAbsoluteShortURL(short string) string {
 	return s.baseURL + "/" + short
 }
 
-func (s *ShortenerService) createModel(orig string) (string, model.URL) {
+func (s *ShortenerService) createModel(ctx context.Context, orig string) (string, model.URL) {
 	short := generateID()
+
+	userId, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		userId = ""
+	}
 
 	model := model.URL{
 		Short:    short,
 		Original: orig,
+		UserId:   userId,
 	}
 
 	return short, model
@@ -103,7 +111,7 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 			continue
 		}
 
-		short, model := s.createModel(orig)
+		short, model := s.createModel(ctx, orig)
 		shortForUnique[i] = short
 
 		urlsToSave = append(urlsToSave, model)
@@ -123,9 +131,24 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 	return result, nil
 }
 
+// GetUserURLs возвращает все URL, созданные пользователем с userId.
+func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error) {
+	_, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return nil, ErrNoUserIDInContext
+	}
+
+	return s.repo.GetUserURLs(ctx)
+}
+
 func generateID() string {
 	b := make([]byte, 6)
 	io.ReadFull(rand.Reader, b)
 
 	return base64.URLEncoding.EncodeToString(b)
+}
+
+func GetUserIDFromContext(ctx context.Context) (string, bool) {
+	userId, ok := ctx.Value(model.ContextUserID).(string)
+	return userId, ok
 }

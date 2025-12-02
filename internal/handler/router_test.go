@@ -35,6 +35,7 @@ func init() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	config.Set(cfg)
 }
 
 func setupRepository(t *testing.T, repoType string) (repo repository.Repository, err error) {

@@ -119,3 +119,28 @@ func (r *DataBaseRepository) queryUrls(ctx context.Context) error {
 
 	return rows.Err()
 }
+
+func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, error) {
+	result := make([]model.URL, 0)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	userId, _ := ctx.Value(model.ContextUserID).(string)
+
+	rows, err := r.db.QueryContext(ctx, "SELECT short, original, user_id FROM urls WHERE user_id = $1", userId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var url model.URL
+		if err := rows.Scan(&url.Short, &url.Original); err != nil {
+			return nil, err
+		}
+		result = append(result, url)
+	}
+
+	return result, nil
+}

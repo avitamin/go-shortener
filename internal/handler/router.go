@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
@@ -35,46 +36,47 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	rtr.Use(lclmw.GzipRequest(log))
 	rtr.Use(lclmw.GzipResponse)
 
-	rtr.Post("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Header.Get("Content-Type") != "text/plain" {
-			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
-			return
-		}
-
-		var statusCode int
-
-		body, err := io.ReadAll(r.Body)
-
-		if err != nil || len(body) == 0 {
-			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
-		}
-		defer r.Body.Close()
-
-		orig := strings.TrimSpace(string(body))
-		short, ok := service.GetShort(orig)
-		if ok {
-			statusCode = http.StatusConflict
-		} else {
-			err := validateOriginalURL(orig)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusBadRequest)
+	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
+		Post("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.Header.Get("Content-Type") != "text/plain" {
+				http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
 				return
 			}
 
-			statusCode = http.StatusCreated
+			var statusCode int
 
-			short, err = service.Shorten(orig)
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
+			body, err := io.ReadAll(r.Body)
+
+			if err != nil || len(body) == 0 {
+				http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
 			}
-		}
+			defer r.Body.Close()
 
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(statusCode)
+			orig := strings.TrimSpace(string(body))
+			short, ok := service.GetShort(orig)
+			if ok {
+				statusCode = http.StatusConflict
+			} else {
+				err := validateOriginalURL(orig)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusBadRequest)
+					return
+				}
 
-		w.Write([]byte(short))
-	})
+				statusCode = http.StatusCreated
+
+				short, err = service.Shorten(r.Context(), orig)
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}
+
+			w.Header().Set("Content-Type", "text/plain")
+			w.WriteHeader(statusCode)
+
+			w.Write([]byte(short))
+		})
 
 	rtr.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -132,7 +134,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			}
 
 			statusCode = http.StatusCreated
-			short, err = service.Shorten(orig)
+			short, err = service.Shorten(r.Context(), orig)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -232,6 +234,45 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(http.StatusCreated)
 		w.Write(respBytes)
 	})
+
+	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
+		Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
+
+			// Контекст с таймаутом 30s
+			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+			defer cancel()
+
+			urls, err := service.GetUserURLs(ctx)
+			if err != nil {
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			if len(urls) == 0 {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+
+			resp := make([]model.UserURLsResponse, 0, len(urls))
+			for _, it := range urls {
+				resp = append(resp, model.UserURLsResponse{
+					OriginalURL: it.Original,
+					ShortURL:    it.Short,
+				})
+			}
+
+			respBytes, err := json.Marshal(resp)
+			if err != nil {
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusCreated)
+			w.Write(respBytes)
+		})
 
 	rtr.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 

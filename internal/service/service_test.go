@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -88,6 +89,10 @@ func TestShorterenerService(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			svc := service.NewShortenerService(repo, tt.baseURL)
 
+			// Добавляем userId в контекст
+			ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
+			defer ctx.Done()
+
 			if tt.testShorten {
 				if tt.invalidOriginalURL != "" {
 					repo.EXPECT().Save(gomock.Any()).Return(errors.New("некорректный url")).AnyTimes()
@@ -95,7 +100,7 @@ func TestShorterenerService(t *testing.T) {
 					repo.EXPECT().Save(gomock.Any()).Return(nil).AnyTimes()
 				}
 
-				shortURL, err := svc.Shorten(tt.originalURL)
+				shortURL, err := svc.Shorten(ctx, tt.originalURL)
 				if tt.wantShortenError {
 					assert.Error(t, err)
 				} else {

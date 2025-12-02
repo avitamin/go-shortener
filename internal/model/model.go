@@ -1,9 +1,14 @@
 package model
 
+type ctxKey string
+
+const ContextUserID ctxKey = "user_id"
+
 type URL struct {
 	UUID     string `json:"uuid"`
 	Short    string `json:"short_url"`
 	Original string `json:"original_url"`
+	UserId   string
 }
 
 type ShortenRequest struct {
@@ -22,4 +27,9 @@ type BatchShortRequest struct {
 type BatchShortenResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
+}
+
+type UserURLsResponse struct {
+	OriginalURL string `json:"original_url"`
+	ShortURL    string `json:"short_url"`
 }

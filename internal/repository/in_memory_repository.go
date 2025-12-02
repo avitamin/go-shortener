@@ -111,3 +111,12 @@ func (r *inMemoryStorage) GetAll() []model.URL {
 	return result
 
 }
+
+func (r *inMemoryStorage) GetUserURLs(ctx context.Context) ([]model.URL, error) {
+	result := make([]model.URL, 0)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return result, nil
+}

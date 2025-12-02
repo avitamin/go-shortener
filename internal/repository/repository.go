@@ -14,6 +14,7 @@ type Repository interface {
 	Find(short string) (model.URL, error)
 	GetShort(orig string) (short string, ok bool)
 	SaveBatch(ctx context.Context, urls []model.URL) error
+	GetUserURLs(ctx context.Context) ([]model.URL, error)
 	Close() error
 	PingContext(ctx context.Context) error
 }

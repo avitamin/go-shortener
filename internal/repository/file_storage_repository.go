@@ -146,6 +146,15 @@ func (r *fileStorageRepositoy) loadFromFile() error {
 	return nil
 }
 
+func (r *fileStorageRepositoy) GetUserURLs(ctx context.Context) ([]model.URL, error) {
+	result := make([]model.URL, 0)
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return result, nil
+}
+
 func (r *fileStorageRepositoy) Close() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()

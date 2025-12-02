@@ -23,6 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration creating error: %v", err)
 	}
+	config.Set(cfg)
 	var repo repository.Repository
 
 	if cfg.DatabaseDsn != "" {

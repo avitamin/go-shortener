@@ -2,6 +2,7 @@ package config
 
 import (
 	"flag"
+	"sync"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -11,6 +12,17 @@ type Config struct {
 	BaseURL         string `env:"BASE_URL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDsn     string `env:"DATABASE_DSN"`
+	SecretKey       string `env:"SECRET_KEY"`
+}
+
+func Set(c *Config) {
+	once.Do(func() {
+		cfg = c
+	})
+}
+
+func Get() *Config {
+	return cfg
 }
 
 var (
@@ -18,6 +30,9 @@ var (
 	base        string
 	filePath    string
 	databaseDsn string
+
+	cfg  *Config
+	once sync.Once
 )
 
 func init() {
@@ -42,6 +57,11 @@ func New(withParse bool) (*Config, error) {
 
 	if err := env.Parse(cfg); err != nil {
 		return nil, err
+	}
+
+	// если секретный ключ не задан, генерируем его
+	if cfg.SecretKey == "" {
+		cfg.SecretKey = "default_secret_key"
 	}
 
 	return cfg, nil
