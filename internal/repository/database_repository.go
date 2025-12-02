@@ -31,8 +31,8 @@ func (r *DataBaseRepository) Find(short string) (model.URL, error) {
 	return r.storage.Find(short)
 }
 
-func (r *DataBaseRepository) GetShort(orig string) (short string, ok bool) {
-	return r.storage.GetShort(orig)
+func (r *DataBaseRepository) GetShort(ctx context.Context, orig string) (short string, ok bool) {
+	return r.storage.GetShort(ctx, orig)
 }
 
 func (r *DataBaseRepository) Save(url model.URL) error {
@@ -41,7 +41,7 @@ func (r *DataBaseRepository) Save(url model.URL) error {
 		return err
 	}
 
-	_, err = r.db.Exec("INSERT INTO urls (short, original) VALUES ($1, $2)", url.Short, url.Original)
+	_, err = r.db.Exec("INSERT INTO urls (short, original, user_id) VALUES ($1, $2, $3)", url.Short, url.Original, url.UserID)
 	if err != nil {
 		return err
 	}
@@ -136,7 +136,7 @@ func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, erro
 
 	for rows.Next() {
 		var url model.URL
-		if err := rows.Scan(&url.Short, &url.Original); err != nil {
+		if err := rows.Scan(&url.Short, &url.Original, &url.UserID); err != nil {
 			return nil, err
 		}
 		result = append(result, url)

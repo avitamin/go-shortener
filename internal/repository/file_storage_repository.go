@@ -49,8 +49,8 @@ func (r *fileStorageRepositoy) Find(id string) (model.URL, error) {
 	return r.storage.Find(id)
 }
 
-func (r *fileStorageRepositoy) GetShort(orig string) (short string, ok bool) {
-	return r.storage.GetShort(orig)
+func (r *fileStorageRepositoy) GetShort(ctx context.Context, orig string) (short string, ok bool) {
+	return r.storage.GetShort(ctx, orig)
 }
 
 func (r *fileStorageRepositoy) Save(url model.URL) error {

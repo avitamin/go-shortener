@@ -65,18 +65,18 @@ func (mr *MockRepositoryMockRecorder) Find(short interface{}) *gomock.Call {
 }
 
 // GetShort mocks base method.
-func (m *MockRepository) GetShort(orig string) (string, bool) {
+func (m *MockRepository) GetShort(ctx context.Context, orig string) (string, bool) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetShort", orig)
+	ret := m.ctrl.Call(m, "GetShort", ctx, orig)
 	ret0, _ := ret[0].(string)
 	ret1, _ := ret[1].(bool)
 	return ret0, ret1
 }
 
 // GetShort indicates an expected call of GetShort.
-func (mr *MockRepositoryMockRecorder) GetShort(orig interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) GetShort(ctx, orig interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShort", reflect.TypeOf((*MockRepository)(nil).GetShort), orig)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetShort", reflect.TypeOf((*MockRepository)(nil).GetShort), ctx, orig)
 }
 
 // GetUserURLs mocks base method.

@@ -41,7 +41,13 @@ func (r *inMemoryStorage) Save(url model.URL) error {
 	return r.saveNoLock(url)
 }
 
-func (r *inMemoryStorage) GetShort(orig string) (short string, ok bool) {
+func (r *inMemoryStorage) GetShort(ctx context.Context, orig string) (short string, ok bool) {
+	select {
+	case <-ctx.Done():
+		return "", false
+	default:
+	}
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

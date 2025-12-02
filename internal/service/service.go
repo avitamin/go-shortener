@@ -74,11 +74,12 @@ func (s *ShortenerService) PingContext(ctx context.Context) error {
 	return nil
 }
 
-func (s *ShortenerService) GetShort(orig string) (string, bool) {
-	short, ok := s.repo.GetShort(orig)
+func (s *ShortenerService) GetShort(ctx context.Context, orig string) (string, bool) {
+	short, ok := s.repo.GetShort(ctx, orig)
 	if ok {
 		return s.GetAbsoluteShortURL(short), true
 	}
+
 	return "", false
 }
 
@@ -105,7 +106,7 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 
 	urlsToSave := make([]model.URL, 0, len(uniques))
 	for i, orig := range uniques {
-		short, ok := s.repo.GetShort(orig)
+		short, ok := s.repo.GetShort(ctx, orig)
 		if ok {
 			shortForUnique[i] = short
 			continue

@@ -53,7 +53,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			defer r.Body.Close()
 
 			orig := strings.TrimSpace(string(body))
-			short, ok := service.GetShort(orig)
+			short, ok := service.GetShort(r.Context(), orig)
 			if ok {
 				statusCode = http.StatusConflict
 			} else {
@@ -123,7 +123,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		}
 
 		orig := strings.TrimSpace(req.URL)
-		short, ok := service.GetShort(orig)
+		short, ok := service.GetShort(r.Context(), orig)
 		if ok {
 			statusCode = http.StatusConflict
 		} else {
