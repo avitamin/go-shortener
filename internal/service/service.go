@@ -147,10 +147,10 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error)
 	}
 
 	for _, url := range urls {
-		var resUrl model.URL
-		resUrl.Original = url.Original
-		resUrl.Short = s.GetAbsoluteShortURL(url.Short)
-		result = append(result, resUrl)
+		var resURL model.URL
+		resURL.Original = url.Original
+		resURL.Short = s.GetAbsoluteShortURL(url.Short)
+		result = append(result, resURL)
 	}
 
 	return result, nil
