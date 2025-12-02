@@ -270,7 +270,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			}
 
 			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusCreated)
+			w.WriteHeader(http.StatusOK)
 			w.Write(respBytes)
 		})
 

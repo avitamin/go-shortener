@@ -134,12 +134,27 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 
 // GetUserURLs возвращает все URL, созданные пользователем с userId.
 func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error) {
+	var result []model.URL
+
 	_, ok := GetUserIDFromContext(ctx)
 	if !ok {
 		return nil, ErrNoUserIDInContext
 	}
 
-	return s.repo.GetUserURLs(ctx)
+	urls, err := s.repo.GetUserURLs(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, url := range urls {
+		var resUrl model.URL
+		resUrl.Original = url.Original
+		resUrl.Short = s.GetAbsoluteShortURL(url.Short)
+		result = append(result, resUrl)
+	}
+
+	return result, nil
+
 }
 
 func generateID() string {
