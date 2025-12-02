@@ -40,15 +40,15 @@ func (s *ShortenerService) GetAbsoluteShortURL(short string) string {
 func (s *ShortenerService) createModel(ctx context.Context, orig string) (string, model.URL) {
 	short := generateID()
 
-	userId, ok := GetUserIDFromContext(ctx)
+	userID, ok := GetUserIDFromContext(ctx)
 	if !ok {
-		userId = ""
+		userID = ""
 	}
 
 	model := model.URL{
 		Short:    short,
 		Original: orig,
-		UserId:   userId,
+		UserID:   userID,
 	}
 
 	return short, model
@@ -149,6 +149,6 @@ func generateID() string {
 }
 
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
-	userId, ok := ctx.Value(model.ContextUserID).(string)
-	return userId, ok
+	userID, ok := ctx.Value(model.ContextUserID).(string)
+	return userID, ok
 }

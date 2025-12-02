@@ -8,7 +8,7 @@ type URL struct {
 	UUID     string `json:"uuid"`
 	Short    string `json:"short_url"`
 	Original string `json:"original_url"`
-	UserId   string
+	UserID   string
 }
 
 type ShortenRequest struct {

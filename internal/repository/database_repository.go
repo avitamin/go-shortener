@@ -126,9 +126,9 @@ func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	userId, _ := ctx.Value(model.ContextUserID).(string)
+	userID, _ := ctx.Value(model.ContextUserID).(string)
 
-	rows, err := r.db.QueryContext(ctx, "SELECT short, original, user_id FROM urls WHERE user_id = $1", userId)
+	rows, err := r.db.QueryContext(ctx, "SELECT short, original, user_id FROM urls WHERE user_id = $1", userID)
 	if err != nil {
 		return nil, err
 	}
@@ -140,6 +140,10 @@ func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, erro
 			return nil, err
 		}
 		result = append(result, url)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 
 	return result, nil
