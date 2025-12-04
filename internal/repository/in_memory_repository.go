@@ -12,7 +12,7 @@ type inMemoryStorage struct {
 	mu             sync.Mutex
 	origByShort    map[string]string
 	shortByOrig    map[string]string
-	userIdByShort  map[string]string
+	userIDByShort  map[string]string
 	deletedByShort map[string]bool
 }
 
@@ -20,7 +20,7 @@ func NewInMemoryStorage() *inMemoryStorage {
 	return &inMemoryStorage{
 		origByShort:    make(map[string]string),
 		shortByOrig:    make(map[string]string),
-		userIdByShort:  make(map[string]string),
+		userIDByShort:  make(map[string]string),
 		deletedByShort: make(map[string]bool),
 	}
 }
@@ -70,7 +70,7 @@ func (r *inMemoryStorage) GetShort(ctx context.Context, orig string) (short stri
 func (r *inMemoryStorage) saveNoLock(url model.URL) error {
 	r.origByShort[url.Short] = url.Original
 	r.shortByOrig[url.Original] = url.Short
-	r.userIdByShort[url.Short] = url.UserID
+	r.userIDByShort[url.Short] = url.UserID
 	if url.DeletedFlag {
 		r.deletedByShort[url.Short] = true
 	}
@@ -150,8 +150,8 @@ func (r *inMemoryStorage) DeleteUserURLs(ctx context.Context, userID string, sho
 	defer r.mu.Unlock()
 
 	for _, short := range shortens {
-		if shortUserId, ok := r.userIdByShort[short]; ok {
-			if shortUserId != userID {
+		if shortUserID, ok := r.userIDByShort[short]; ok {
+			if shortUserID != userID {
 				continue
 			}
 
