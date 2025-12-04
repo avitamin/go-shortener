@@ -5,10 +5,11 @@ type ctxKey string
 const ContextUserID ctxKey = "user_id"
 
 type URL struct {
-	UUID     string `json:"uuid"`
-	Short    string `json:"short_url"`
-	Original string `json:"original_url"`
-	UserID   string
+	UUID        string `json:"uuid"`
+	Short       string `json:"short_url"`
+	Original    string `json:"original_url"`
+	UserID      string
+	DeletedFlag bool
 }
 
 type ShortenRequest struct {

@@ -9,3 +9,10 @@
 - откатывать изменения при необходимости
 
 Тема миграций будет подробно изучаться дальше по курсу.
+
+
+# Команды
+
+```bash
+migrate create -ext sql -dir ./migrations -seq add_user_id_column_to_urls_table
+```

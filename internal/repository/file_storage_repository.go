@@ -53,8 +53,8 @@ func (r *fileStorageRepositoy) GetShort(ctx context.Context, orig string) (short
 	return r.storage.GetShort(ctx, orig)
 }
 
-func (r *fileStorageRepositoy) Save(url model.URL) error {
-	if err := r.storage.Save(url); err != nil {
+func (r *fileStorageRepositoy) Save(ctx context.Context, url model.URL) error {
+	if err := r.storage.Save(ctx, url); err != nil {
 		return err
 	}
 
@@ -141,7 +141,7 @@ func (r *fileStorageRepositoy) loadFromFile() error {
 			// пропускаем битые строки
 			continue
 		}
-		r.storage.Save(u)
+		r.storage.Save(context.Background(), u)
 	}
 	return nil
 }
@@ -153,6 +153,13 @@ func (r *fileStorageRepositoy) GetUserURLs(ctx context.Context) ([]model.URL, er
 	defer r.mu.Unlock()
 
 	return result, nil
+}
+
+func (r *fileStorageRepositoy) DeleteUserURLs(ctx context.Context, userID string, shortens []string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return nil
 }
 
 func (r *fileStorageRepositoy) Close() error {

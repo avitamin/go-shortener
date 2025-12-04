@@ -85,14 +85,18 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		}
 
 		original, err := service.Resolve(id)
-
 		if err != nil {
-			if err == repository.ErrNotFound {
+			log.Error(err.Error())
+
+			switch {
+			case errors.Is(err, repository.ErrIsDeleted):
+				http.Error(w, "URL был удалён", http.StatusGone)
+				return
+			case errors.Is(err, repository.ErrNotFound):
 				http.Error(w, "URL не найден", http.StatusBadRequest)
 				return
 			}
 
-			log.Error(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
 		}
@@ -234,6 +238,43 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(http.StatusCreated)
 		w.Write(respBytes)
 	})
+
+	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
+		Delete("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
+			var req []string
+
+			if r.Header.Get("Content-Type") != "application/json" {
+				http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
+				return
+			}
+
+			body, err := io.ReadAll(r.Body)
+			if err != nil || len(body) == 0 {
+				http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
+				return
+			}
+			defer r.Body.Close()
+
+			if err := json.Unmarshal(body, &req); err != nil {
+				log.Error(err.Error())
+				http.Error(w, "Некорректный JSON", http.StatusBadRequest)
+				return
+			}
+
+			if len(req) == 0 {
+				http.Error(w, "Пустой массив", http.StatusBadRequest)
+				return
+			}
+
+			err = service.DeleteUserURLs(r.Context(), req)
+			if err != nil {
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			w.WriteHeader(http.StatusAccepted)
+		})
 
 	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
 		Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {

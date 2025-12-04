@@ -95,9 +95,9 @@ func TestShorterenerService(t *testing.T) {
 
 			if tt.testShorten {
 				if tt.invalidOriginalURL != "" {
-					repo.EXPECT().Save(gomock.Any()).Return(errors.New("некорректный url")).AnyTimes()
+					repo.EXPECT().Save(ctx, gomock.Any()).Return(errors.New("некорректный url")).AnyTimes()
 				} else {
-					repo.EXPECT().Save(gomock.Any()).Return(nil).AnyTimes()
+					repo.EXPECT().Save(ctx, gomock.Any()).Return(nil).AnyTimes()
 				}
 
 				shortURL, err := svc.Shorten(ctx, tt.originalURL)

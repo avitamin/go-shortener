@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
 	"log"
@@ -222,7 +223,7 @@ func TestGET_Success(t *testing.T) {
 		t.Fatalf("failed to setup router: %v", err)
 	}
 
-	_ = repo.Save(model.URL{Short: "xyz", Original: "https://ya.ru"})
+	_ = repo.Save(context.Background(), model.URL{Short: "xyz", Original: "https://ya.ru"})
 
 	req := httptest.NewRequest(http.MethodGet, "/xyz", nil)
 	w := httptest.NewRecorder()

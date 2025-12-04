@@ -3,9 +3,11 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"log"
 	"sync"
 
 	"github.com/avitamin/go-shortener/internal/model"
+	"github.com/lib/pq"
 )
 
 type DataBaseRepository struct {
@@ -35,8 +37,8 @@ func (r *DataBaseRepository) GetShort(ctx context.Context, orig string) (short s
 	return r.storage.GetShort(ctx, orig)
 }
 
-func (r *DataBaseRepository) Save(url model.URL) error {
-	err := r.storage.Save(url)
+func (r *DataBaseRepository) Save(ctx context.Context, url model.URL) error {
+	err := r.storage.Save(ctx, url)
 	if err != nil {
 		return err
 	}
@@ -79,7 +81,7 @@ func (r *DataBaseRepository) SaveBatch(ctx context.Context, urls []model.URL) er
 			return err
 		}
 		// Записываем в in-memory storage
-		if err := r.storage.Save(u); err != nil {
+		if err := r.storage.Save(ctx, u); err != nil {
 			tx.Rollback()
 			return err
 		}
@@ -101,7 +103,7 @@ func (r *DataBaseRepository) PingContext(ctx context.Context) error {
 }
 
 func (r *DataBaseRepository) queryUrls(ctx context.Context) error {
-	rows, err := r.db.QueryContext(ctx, "SELECT short, original FROM urls")
+	rows, err := r.db.QueryContext(ctx, "SELECT short, original, user_id, is_deleted FROM urls")
 	if err != nil {
 		return err
 	}
@@ -109,10 +111,10 @@ func (r *DataBaseRepository) queryUrls(ctx context.Context) error {
 
 	for rows.Next() {
 		var url model.URL
-		if err := rows.Scan(&url.Short, &url.Original); err != nil {
+		if err := rows.Scan(&url.Short, &url.Original, &url.UserID, &url.DeletedFlag); err != nil {
 			return err
 		}
-		if err := r.storage.Save(url); err != nil {
+		if err := r.storage.Save(ctx, url); err != nil {
 			return err
 		}
 	}
@@ -147,4 +149,44 @@ func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, erro
 	}
 
 	return result, nil
+}
+
+func (r *DataBaseRepository) DeleteUserURLs(ctx context.Context, userID string, shortens []string) error {
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	// подготавливаем statement для пометки на удаление
+	stmt, err := tx.PrepareContext(ctx, "UPDATE urls SET is_deleted = TRUE WHERE user_id = $1 AND short = ANY($2)")
+	if err != nil {
+		tx.Rollback()
+		return err
+	}
+	defer stmt.Close()
+
+	if _, err := stmt.ExecContext(ctx, userID, pq.Array(shortens)); err != nil {
+		tx.Rollback()
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return err
+	}
+
+	log.Println("Mark URLs as deleted in DB for user:", userID, "shortens:", shortens)
+
+	// Обновляем in-memory storage
+	r.storage.DeleteUserURLs(ctx, userID, shortens)
+
+	return nil
 }

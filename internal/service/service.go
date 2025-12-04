@@ -6,6 +6,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"log"
+	"time"
 
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -14,19 +16,33 @@ import (
 var ErrNoUserIDInContext = errors.New("no user ID in context")
 
 type ShortenerService struct {
-	repo    repository.Repository
-	baseURL string
+	repo           repository.Repository
+	baseURL        string
+	deleteUserURLs chan DeleteUserURLs
+}
+
+type DeleteUserURLs struct {
+	ShortURLs []string
+	UserID    string
 }
 
 func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
-	return &ShortenerService{repo: repo, baseURL: baseURL}
+	instance := &ShortenerService{
+		repo:           repo,
+		baseURL:        baseURL,
+		deleteUserURLs: make(chan DeleteUserURLs, 10),
+	}
+
+	go instance.deleteUserURLsWorker()
+
+	return instance
 }
 
 func (s *ShortenerService) Shorten(ctx context.Context, orig string) (string, error) {
 
 	short, url := s.createModel(ctx, orig)
 
-	if err := s.repo.Save(url); err != nil {
+	if err := s.repo.Save(ctx, url); err != nil {
 		return "", err
 	}
 
@@ -56,7 +72,6 @@ func (s *ShortenerService) createModel(ctx context.Context, orig string) (string
 
 func (s *ShortenerService) Resolve(id string) (string, error) {
 	url, err := s.repo.Find(id)
-
 	if err != nil {
 		return "", err
 	}
@@ -155,6 +170,55 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error)
 
 	return result, nil
 
+}
+
+// DeleteUserURLs помечает на удаление URL, созданные пользователем с userId.
+func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []string) error {
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	userID, ok := GetUserIDFromContext(ctx)
+	if !ok {
+		return ErrNoUserIDInContext
+	}
+
+	s.deleteUserURLs <- DeleteUserURLs{
+		ShortURLs: shortURLs,
+		UserID:    userID,
+	}
+
+	return nil
+}
+
+func (s *ShortenerService) deleteUserURLsWorker() {
+
+	ticker := time.NewTicker(5 * time.Second)
+
+	forDelete := make(map[string][]string) // userID -> []shortURL
+
+	for {
+		select {
+		case deleteReq := <-s.deleteUserURLs:
+			forDelete[deleteReq.UserID] = append(forDelete[deleteReq.UserID], deleteReq.ShortURLs...)
+		case <-ticker.C:
+			for userID, shortURLs := range forDelete {
+				ctx := context.Background()
+				err := s.repo.DeleteUserURLs(ctx, userID, shortURLs)
+				if err != nil {
+					// Логируем ошибку, но продолжаем
+					log.Printf("Error deleting URLs for user %s: %v", userID, err)
+					continue
+				}
+
+				// После успешного удаления очищаем список
+				delete(forDelete, userID)
+			}
+		}
+	}
 }
 
 func generateID() string {

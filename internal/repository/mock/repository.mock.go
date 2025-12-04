@@ -49,6 +49,20 @@ func (mr *MockRepositoryMockRecorder) Close() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockRepository)(nil).Close))
 }
 
+// DeleteUserURLs mocks base method.
+func (m *MockRepository) DeleteUserURLs(ctx context.Context, userID string, shortens []string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteUserURLs", ctx, userID, shortens)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteUserURLs indicates an expected call of DeleteUserURLs.
+func (mr *MockRepositoryMockRecorder) DeleteUserURLs(ctx, userID, shortens interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserURLs", reflect.TypeOf((*MockRepository)(nil).DeleteUserURLs), ctx, userID, shortens)
+}
+
 // Find mocks base method.
 func (m *MockRepository) Find(short string) (model.URL, error) {
 	m.ctrl.T.Helper()
@@ -109,17 +123,17 @@ func (mr *MockRepositoryMockRecorder) PingContext(ctx interface{}) *gomock.Call 
 }
 
 // Save mocks base method.
-func (m *MockRepository) Save(url model.URL) error {
+func (m *MockRepository) Save(ctx context.Context, url model.URL) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Save", url)
+	ret := m.ctrl.Call(m, "Save", ctx, url)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // Save indicates an expected call of Save.
-func (mr *MockRepositoryMockRecorder) Save(url interface{}) *gomock.Call {
+func (mr *MockRepositoryMockRecorder) Save(ctx, url interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockRepository)(nil).Save), url)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Save", reflect.TypeOf((*MockRepository)(nil).Save), ctx, url)
 }
 
 // SaveBatch mocks base method.
