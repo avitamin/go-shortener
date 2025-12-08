@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
@@ -35,48 +34,50 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	rtr.Use(lclmw.ZapLogger(log))
 	rtr.Use(lclmw.GzipRequest(log))
 	rtr.Use(lclmw.GzipResponse)
+	rtr.Use(lclmw.Auth(service.Config.SecretKey, log))
 
-	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
-		Post("/", func(w http.ResponseWriter, r *http.Request) {
-			if r.Header.Get("Content-Type") != "text/plain" {
-				http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
+	rtr.Post("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Content-Type") != "text/plain" {
+			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
+			return
+		}
+
+		var statusCode int
+
+		body, err := io.ReadAll(r.Body)
+
+		if err != nil || len(body) == 0 {
+			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
+
+		orig := strings.TrimSpace(string(body))
+		short, ok := service.GetShort(r.Context(), orig)
+		if ok {
+			statusCode = http.StatusConflict
+		} else {
+			err := validateOriginalURL(orig)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
 
-			var statusCode int
+			statusCode = http.StatusCreated
 
-			body, err := io.ReadAll(r.Body)
-
-			if err != nil || len(body) == 0 {
-				http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
+			short, err = service.Shorten(r.Context(), orig)
+			if err != nil {
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
 			}
-			defer r.Body.Close()
+		}
 
-			orig := strings.TrimSpace(string(body))
-			short, ok := service.GetShort(r.Context(), orig)
-			if ok {
-				statusCode = http.StatusConflict
-			} else {
-				err := validateOriginalURL(orig)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusBadRequest)
-					return
-				}
+		w.Header().Set("Content-Type", "text/plain")
+		w.WriteHeader(statusCode)
 
-				statusCode = http.StatusCreated
-
-				short, err = service.Shorten(r.Context(), orig)
-				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-			}
-
-			w.Header().Set("Content-Type", "text/plain")
-			w.WriteHeader(statusCode)
-
-			w.Write([]byte(short))
-		})
+		w.Write([]byte(short))
+	})
 
 	rtr.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
 		id := chi.URLParam(r, "id")
@@ -140,7 +141,8 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			statusCode = http.StatusCreated
 			short, err = service.Shorten(r.Context(), orig)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 				return
 			}
 		}
@@ -239,81 +241,79 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.Write(respBytes)
 	})
 
-	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
-		Delete("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
-			var req []string
+	rtr.Delete("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
+		var req []string
 
-			if r.Header.Get("Content-Type") != "application/json" {
-				http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
-				return
-			}
+		if r.Header.Get("Content-Type") != "application/json" {
+			http.Error(w, "Некорректный Content-Type", http.StatusBadRequest)
+			return
+		}
 
-			body, err := io.ReadAll(r.Body)
-			if err != nil || len(body) == 0 {
-				http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
-				return
-			}
-			defer r.Body.Close()
+		body, err := io.ReadAll(r.Body)
+		if err != nil || len(body) == 0 {
+			http.Error(w, "Пустое тело запроса", http.StatusBadRequest)
+			return
+		}
+		defer r.Body.Close()
 
-			if err := json.Unmarshal(body, &req); err != nil {
-				log.Error(err.Error())
-				http.Error(w, "Некорректный JSON", http.StatusBadRequest)
-				return
-			}
+		if err := json.Unmarshal(body, &req); err != nil {
+			log.Error(err.Error())
+			http.Error(w, "Некорректный JSON", http.StatusBadRequest)
+			return
+		}
 
-			if len(req) == 0 {
-				http.Error(w, "Пустой массив", http.StatusBadRequest)
-				return
-			}
+		if len(req) == 0 {
+			http.Error(w, "Пустой массив", http.StatusBadRequest)
+			return
+		}
 
-			err = service.DeleteUserURLs(r.Context(), req)
-			if err != nil {
-				log.Error(err.Error())
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		err = service.DeleteUserURLs(r.Context(), req)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 
-			w.WriteHeader(http.StatusAccepted)
-		})
+		w.WriteHeader(http.StatusAccepted)
+	})
 
-	rtr.With(lclmw.Auth(config.Get().SecretKey, log)).
-		Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
+	rtr.Get("/api/user/urls", func(w http.ResponseWriter, r *http.Request) {
 
-			// Контекст с таймаутом 30s
-			ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
-			defer cancel()
+		// Контекст с таймаутом 30s
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
 
-			urls, err := service.GetUserURLs(ctx)
-			if err != nil {
-				log.Error(err.Error())
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		urls, err := service.GetUserURLs(ctx)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 
-			if len(urls) == 0 {
-				w.WriteHeader(http.StatusNoContent)
-				return
-			}
+		if len(urls) == 0 {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
 
-			resp := make([]model.UserURLsResponse, 0, len(urls))
-			for _, it := range urls {
-				resp = append(resp, model.UserURLsResponse{
-					OriginalURL: it.Original,
-					ShortURL:    it.Short,
-				})
-			}
+		resp := make([]model.UserURLsResponse, 0, len(urls))
+		for _, it := range urls {
+			resp = append(resp, model.UserURLsResponse{
+				OriginalURL: it.Original,
+				ShortURL:    it.Short,
+			})
+		}
 
-			respBytes, err := json.Marshal(resp)
-			if err != nil {
-				log.Error(err.Error())
-				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-				return
-			}
+		respBytes, err := json.Marshal(resp)
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
 
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			w.Write(respBytes)
-		})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respBytes)
+	})
 
 	rtr.Get("/ping", func(w http.ResponseWriter, r *http.Request) {
 

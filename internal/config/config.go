@@ -1,11 +1,19 @@
 package config
 
 import (
+	"errors"
 	"flag"
-	"sync"
+	"fmt"
+	"net/url"
 
 	"github.com/caarlos0/env/v6"
 )
+
+var ErrSecretKeyReq error = errors.New("secret key required")
+
+const DefaultAddress = "localhost:8080"
+const DefaultBaseURL = "http://localhost:8080"
+const DefaultFileStoragePath = "./runtime/storage"
 
 type Config struct {
 	Address         string `env:"SERVER_ADDRESS"`
@@ -15,54 +23,42 @@ type Config struct {
 	SecretKey       string `env:"SECRET_KEY"`
 }
 
-func Set(c *Config) {
-	once.Do(func() {
-		cfg = c
-	})
-}
-
-func Get() *Config {
-	return cfg
-}
-
-var (
-	addr        string
-	base        string
-	filePath    string
-	databaseDsn string
-
-	cfg  *Config
-	once sync.Once
-)
-
-func init() {
-	flag.StringVar(&addr, "a", "localhost:8080", "адрес сервера (например localhost:8080)")
-	flag.StringVar(&base, "b", "http://localhost:8080", "базовый URL (например http://localhost:8080)")
-	flag.StringVar(&filePath, "f", "./runtime/storage", "путь к файлу хранилища (например ./runtime/storage)")
-	flag.StringVar(&databaseDsn, "d", "", "DSN (например postgres://postgres:postgres@db:5432/postgres)")
-}
-
 func New(withParse bool) (*Config, error) {
+	var cfg Config
+
+	flag.StringVar(&cfg.Address, "a", DefaultAddress, "адрес сервера (например localhost:8080)")
+	flag.StringVar(&cfg.BaseURL, "b", DefaultBaseURL, "базовый URL (например http://localhost:8080)")
+	flag.StringVar(&cfg.FileStoragePath, "f", DefaultFileStoragePath, "путь к файлу хранилища (например ./runtime/storage)")
+	flag.StringVar(&cfg.DatabaseDsn, "d", "", "DSN (например postgres://postgres:postgres@db:5432/postgres)")
 
 	if withParse {
 		flag.Parse()
 	}
 
-	cfg := &Config{
-		Address:         addr,
-		BaseURL:         base,
-		FileStoragePath: filePath,
-		DatabaseDsn:     databaseDsn,
-	}
-
-	if err := env.Parse(cfg); err != nil {
+	if err := env.Parse(&cfg); err != nil {
 		return nil, err
 	}
 
-	// если секретный ключ не задан, генерируем его
-	if cfg.SecretKey == "" {
-		cfg.SecretKey = "default_secret_key"
+	if err := cfg.Validate(); err != nil {
+		return nil, err
 	}
 
-	return cfg, nil
+	return &cfg, nil
+}
+
+func (c *Config) ParseFlags() {
+
+	flag.Parse()
+}
+
+func (c *Config) Validate() error {
+	if c.SecretKey == "" {
+		return ErrSecretKeyReq
+	}
+
+	if _, err := url.ParseRequestURI(c.BaseURL); err != nil {
+		return fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	return nil
 }

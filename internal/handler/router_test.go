@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -32,11 +33,11 @@ var (
 func init() {
 	var err error
 
+	os.Setenv("SECRET_KEY", "secret_key")
 	cfg, err = config.New(false)
 	if err != nil {
 		log.Fatal(err)
 	}
-	config.Set(cfg)
 }
 
 func setupRepository(t *testing.T, repoType string) (repo repository.Repository, err error) {
@@ -64,7 +65,7 @@ func setupRepository(t *testing.T, repoType string) (repo repository.Repository,
 func setupService(t *testing.T, repo repository.Repository) *service.ShortenerService {
 	t.Helper()
 
-	svc := service.NewShortenerService(repo, cfg.BaseURL)
+	svc := service.NewShortenerService(repo, cfg)
 
 	return svc
 }

@@ -1,8 +1,32 @@
 package model
 
+import (
+	"context"
+	"errors"
+)
+
+var ErrUserNotFound error = errors.New("user not found")
+
 type ctxKey string
 
 const ContextUserID ctxKey = "user_id"
+
+type User struct {
+	ID string
+}
+
+func UserFromContext(ctx context.Context) (User, error) {
+	userId, ok := ctx.Value(ContextUserID).(string)
+	if ok {
+		return User{ID: userId}, nil
+	}
+
+	return User{}, ErrUserNotFound
+}
+
+func NewContextWithUser(ctx context.Context, userId string) context.Context {
+	return context.WithValue(ctx, ContextUserID, userId)
+}
 
 type URL struct {
 	UUID        string `json:"uuid"`

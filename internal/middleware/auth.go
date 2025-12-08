@@ -18,29 +18,23 @@ import (
 const cookieName = "user_id"
 
 var ErrCookieMissingID = errors.New("cookie missing user id")
+var ErrSecretKeyReq = errors.New("auth secret is empty")
 
 // Auth возвращает middleware; secret не должен быть пустым.
 func Auth(secret string, logger *zap.Logger) func(next http.Handler) http.Handler {
-	if secret == "" {
-		panic("auth secret is empty")
-	}
-
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			c, err := r.Cookie(cookieName)
-			if err == http.ErrNoCookie {
+			if err != nil {
+				if err != http.ErrNoCookie {
+					// прочие ошибки получения cookie — логируем и создаём новую cookie
+					logger.Warn("failed to read cookie, creating new one", zap.Error(err))
+				}
+
 				// Нет cookie — создаём новую и продолжаем
 				newID := uuid.New().String()
 				setSignedCookie(w, newID, secret)
-				ctx := context.WithValue(r.Context(), model.ContextUserID, newID)
-				next.ServeHTTP(w, r.WithContext(ctx))
-				return
-			} else if err != nil {
-				// прочие ошибки получения cookie — логируем и создаём новую cookie
-				logger.Warn("failed to read cookie, creating new one", zap.Error(err))
-				newID := uuid.New().String()
-				setSignedCookie(w, newID, secret)
-				ctx := context.WithValue(r.Context(), model.ContextUserID, newID)
+				ctx := model.NewContextWithUser(r.Context(), newID)
 				next.ServeHTTP(w, r.WithContext(ctx))
 				return
 			}

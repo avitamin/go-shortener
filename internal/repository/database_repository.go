@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"sync"
 
@@ -128,11 +129,14 @@ func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, erro
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	userID, _ := ctx.Value(model.ContextUserID).(string)
-
-	rows, err := r.db.QueryContext(ctx, "SELECT short, original, user_id FROM urls WHERE user_id = $1", userID)
+	user, err := model.UserFromContext(ctx)
 	if err != nil {
 		return nil, err
+	}
+
+	rows, err := r.db.QueryContext(ctx, "SELECT short, original, user_id FROM urls WHERE user_id = $1", user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("selection query error: %w", err)
 	}
 	defer rows.Close()
 
@@ -158,18 +162,15 @@ func (r *DataBaseRepository) DeleteUserURLs(ctx context.Context, userID string, 
 	default:
 	}
 
-	r.mu.Lock()
-	defer r.mu.Unlock()
-
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
+	defer tx.Rollback()
 
 	// подготавливаем statement для пометки на удаление
 	stmt, err := tx.PrepareContext(ctx, "UPDATE urls SET is_deleted = TRUE WHERE user_id = $1 AND short = ANY($2)")
 	if err != nil {
-		tx.Rollback()
 		return err
 	}
 	defer stmt.Close()

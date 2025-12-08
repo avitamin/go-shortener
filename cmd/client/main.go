@@ -19,7 +19,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	config.Set(cfg)
 
 	endpoint := cfg.BaseURL + "/"
 	// контейнер данных для запроса

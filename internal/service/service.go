@@ -7,17 +7,21 @@ import (
 	"errors"
 	"io"
 	"log"
+	"sync"
 	"time"
 
+	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
 )
 
 var ErrNoUserIDInContext = errors.New("no user ID in context")
 
+const deleteUserURLsWorkersCoount = 5
+
 type ShortenerService struct {
 	repo           repository.Repository
-	baseURL        string
+	Config         *config.Config
 	deleteUserURLs chan DeleteUserURLs
 }
 
@@ -26,14 +30,14 @@ type DeleteUserURLs struct {
 	UserID    string
 }
 
-func NewShortenerService(repo repository.Repository, baseURL string) *ShortenerService {
+func NewShortenerService(repo repository.Repository, config *config.Config) *ShortenerService {
 	instance := &ShortenerService{
 		repo:           repo,
-		baseURL:        baseURL,
+		Config:         config,
 		deleteUserURLs: make(chan DeleteUserURLs, 10),
 	}
 
-	go instance.deleteUserURLsWorker()
+	instance.initDeleteWorkers()
 
 	return instance
 }
@@ -50,7 +54,7 @@ func (s *ShortenerService) Shorten(ctx context.Context, orig string) (string, er
 }
 
 func (s *ShortenerService) GetAbsoluteShortURL(short string) string {
-	return s.baseURL + "/" + short
+	return s.Config.BaseURL + "/" + short
 }
 
 func (s *ShortenerService) createModel(ctx context.Context, orig string) (string, model.URL) {
@@ -141,7 +145,7 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 	result := make([]string, len(originals))
 	for i, idx := range indices {
 
-		result[i] = s.baseURL + "/" + shortForUnique[idx]
+		result[i] = s.Config.BaseURL + "/" + shortForUnique[idx]
 	}
 
 	return result, nil
@@ -194,31 +198,69 @@ func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []strin
 	return nil
 }
 
-func (s *ShortenerService) deleteUserURLsWorker() {
+func (s *ShortenerService) initDeleteWorkers() {
+	for range deleteUserURLsWorkersCoount {
+		go s.deleteWorker()
+	}
+}
+
+type deleteQueue struct {
+	sync.Mutex
+	Items map[string][]string
+}
+
+func newDeleteQueue() *deleteQueue {
+	return &deleteQueue{
+		Items: make(map[string][]string), // userID -> []shortURL
+	}
+}
+
+var dQ = newDeleteQueue()
+
+func (s *ShortenerService) deleteWorker() {
 
 	ticker := time.NewTicker(5 * time.Second)
-
-	forDelete := make(map[string][]string) // userID -> []shortURL
 
 	for {
 		select {
 		case deleteReq := <-s.deleteUserURLs:
-			forDelete[deleteReq.UserID] = append(forDelete[deleteReq.UserID], deleteReq.ShortURLs...)
+			dQ.Lock()
+			dQ.Items[deleteReq.UserID] = append(dQ.Items[deleteReq.UserID], deleteReq.ShortURLs...)
+			dQ.Unlock()
+			log.Printf("Queued %d URLs for deletion for user %s", len(deleteReq.ShortURLs), deleteReq.UserID)
+
+			log.Printf("%v", dQ.Items)
 		case <-ticker.C:
-			for userID, shortURLs := range forDelete {
-				ctx := context.Background()
-				err := s.repo.DeleteUserURLs(ctx, userID, shortURLs)
+			dQ.Lock()
+			batch := dQ.Items
+			dQ.Items = make(map[string][]string)
+			dQ.Unlock()
+
+			for userID, shortURLs := range batch {
+				log.Printf("Flushing deletion of %v for user %s", shortURLs, userID)
+
+				err := s.flushDeleteUserURLs(userID, shortURLs)
 				if err != nil {
-					// Логируем ошибку, но продолжаем
 					log.Printf("Error deleting URLs for user %s: %v", userID, err)
 					continue
 				}
 
 				// После успешного удаления очищаем список
-				delete(forDelete, userID)
+				delete(dQ.Items, userID)
 			}
 		}
 	}
+}
+
+func (s *ShortenerService) flushDeleteUserURLs(userID string, shortURLs []string) error {
+	ctx := context.Background()
+	err := s.repo.DeleteUserURLs(ctx, userID, shortURLs)
+	if err != nil {
+		log.Printf("Error deleting URLs for user %s: %v", userID, err)
+		return err
+	}
+
+	return nil
 }
 
 func generateID() string {

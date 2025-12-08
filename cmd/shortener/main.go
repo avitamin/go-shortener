@@ -23,7 +23,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration creating error: %v", err)
 	}
-	config.Set(cfg)
 	var repo repository.Repository
 
 	if cfg.DatabaseDsn != "" {
@@ -61,7 +60,7 @@ func main() {
 	}
 	defer repo.Close()
 
-	svc := service.NewShortenerService(repo, cfg.BaseURL)
+	svc := service.NewShortenerService(repo, cfg)
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {
