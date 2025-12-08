@@ -16,16 +16,16 @@ type User struct {
 }
 
 func UserFromContext(ctx context.Context) (User, error) {
-	userId, ok := ctx.Value(ContextUserID).(string)
+	userID, ok := ctx.Value(ContextUserID).(string)
 	if ok {
-		return User{ID: userId}, nil
+		return User{ID: userID}, nil
 	}
 
 	return User{}, ErrUserNotFound
 }
 
-func NewContextWithUser(ctx context.Context, userId string) context.Context {
-	return context.WithValue(ctx, ContextUserID, userId)
+func NewContextWithUser(ctx context.Context, userID string) context.Context {
+	return context.WithValue(ctx, ContextUserID, userID)
 }
 
 type URL struct {
