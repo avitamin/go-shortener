@@ -60,7 +60,7 @@ func main() {
 	}
 	defer repo.Close()
 
-	svc := service.NewShortenerService(repo, cfg.BaseURL)
+	svc := service.NewShortenerService(repo, cfg)
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {

@@ -2,11 +2,13 @@ package handler_test
 
 import (
 	"compress/gzip"
+	"context"
 	"errors"
 	"io"
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -31,6 +33,7 @@ var (
 func init() {
 	var err error
 
+	os.Setenv("SECRET_KEY", "secret_key")
 	cfg, err = config.New(false)
 	if err != nil {
 		log.Fatal(err)
@@ -62,7 +65,7 @@ func setupRepository(t *testing.T, repoType string) (repo repository.Repository,
 func setupService(t *testing.T, repo repository.Repository) *service.ShortenerService {
 	t.Helper()
 
-	svc := service.NewShortenerService(repo, cfg.BaseURL)
+	svc := service.NewShortenerService(repo, cfg)
 
 	return svc
 }
@@ -221,7 +224,7 @@ func TestGET_Success(t *testing.T) {
 		t.Fatalf("failed to setup router: %v", err)
 	}
 
-	_ = repo.Save(model.URL{Short: "xyz", Original: "https://ya.ru"})
+	_ = repo.Save(context.Background(), model.URL{Short: "xyz", Original: "https://ya.ru"})
 
 	req := httptest.NewRequest(http.MethodGet, "/xyz", nil)
 	w := httptest.NewRecorder()

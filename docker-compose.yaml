@@ -6,7 +6,9 @@ services:
     depends_on:
       - db
     environment:
+      - SERVER_ADDRESS=:8080
       - DATABASE_DSN=postgres://postgres:postgres@db:5432/shortener?sslmode=disable
+      - SECRET_KEY=secret_key
     command: ["./main"]
     restart: unless-stopped
 

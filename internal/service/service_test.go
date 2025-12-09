@@ -1,9 +1,13 @@
 package service_test
 
 import (
+	"context"
 	"errors"
+	"log"
+	"os"
 	"testing"
 
+	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
 	mock_repository "github.com/avitamin/go-shortener/internal/repository/mock"
@@ -11,6 +15,20 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 )
+
+var (
+	cfg *config.Config
+)
+
+func init() {
+	var err error
+
+	os.Setenv("SECRET_KEY", "secret_key")
+	cfg, err = config.New(false)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
 
 func TestShorterenerService(t *testing.T) {
 	tests := []struct {
@@ -21,23 +39,23 @@ func TestShorterenerService(t *testing.T) {
 		shortURL           string
 		wrongShortURL      string
 		testShorten        bool
-		wantShortenError   bool
+		expectShortenError bool
 		testResolve        bool
-		wantResolveError   bool
-		wantResolveErrorIs error
+		expectResolveError bool
+		wantResolveError   error
 		wantResolvedURL    string
 		wantEmptyShortURL  bool
 	}{
 		{
-			name:              "shorten success",
-			testShorten:       true,
-			testResolve:       false,
-			baseURL:           "http://localhost:8080",
-			originalURL:       "https://yandex.ru",
-			shortURL:          "http://localhost:8080/short",
-			wantShortenError:  false,
-			wantResolveError:  false,
-			wantEmptyShortURL: false,
+			name:               "shorten success",
+			testShorten:        true,
+			testResolve:        false,
+			baseURL:            "http://localhost:8080",
+			originalURL:        "https://yandex.ru",
+			shortURL:           "http://localhost:8080/short",
+			expectShortenError: false,
+			expectResolveError: false,
+			wantEmptyShortURL:  false,
 		},
 		{
 			name:               "shorten with invalid URL",
@@ -46,21 +64,21 @@ func TestShorterenerService(t *testing.T) {
 			baseURL:            "http://localhost:8080",
 			invalidOriginalURL: "yandex.ru",
 			shortURL:           "http://localhost:8080/short",
-			wantShortenError:   true,
-			wantResolveError:   false,
+			expectShortenError: true,
+			expectResolveError: false,
 			wantEmptyShortURL:  true,
 		},
 		{
-			name:              "resolve success",
-			testShorten:       false,
-			testResolve:       true,
-			baseURL:           "http://localhost:8080",
-			originalURL:       "https://yandex.ru",
-			shortURL:          "short",
-			wantShortenError:  false,
-			wantResolveError:  false,
-			wantResolvedURL:   "https://yandex.ru",
-			wantEmptyShortURL: false,
+			name:               "resolve success",
+			testShorten:        false,
+			testResolve:        true,
+			baseURL:            "http://localhost:8080",
+			originalURL:        "https://yandex.ru",
+			shortURL:           "short",
+			expectShortenError: false,
+			expectResolveError: false,
+			wantResolvedURL:    "https://yandex.ru",
+			wantEmptyShortURL:  false,
 		},
 		{
 			name:               "resolve not found",
@@ -69,9 +87,9 @@ func TestShorterenerService(t *testing.T) {
 			baseURL:            "http://localhost:8080",
 			originalURL:        "https://yandex.ru",
 			wrongShortURL:      "wrong url",
-			wantShortenError:   false,
-			wantResolveError:   true,
-			wantResolveErrorIs: repository.ErrNotFound,
+			expectShortenError: false,
+			expectResolveError: true,
+			wantResolveError:   repository.ErrNotFound,
 			wantEmptyShortURL:  false,
 		},
 	}
@@ -86,17 +104,22 @@ func TestShorterenerService(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc := service.NewShortenerService(repo, tt.baseURL)
+			cfg.BaseURL = tt.baseURL
+			svc := service.NewShortenerService(repo, cfg)
+
+			// Добавляем userId в контекст
+			ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
+			defer ctx.Done()
 
 			if tt.testShorten {
 				if tt.invalidOriginalURL != "" {
-					repo.EXPECT().Save(gomock.Any()).Return(errors.New("некорректный url")).AnyTimes()
+					repo.EXPECT().Save(ctx, gomock.Any()).Return(errors.New("некорректный url")).AnyTimes()
 				} else {
-					repo.EXPECT().Save(gomock.Any()).Return(nil).AnyTimes()
+					repo.EXPECT().Save(ctx, gomock.Any()).Return(nil).AnyTimes()
 				}
 
-				shortURL, err := svc.Shorten(tt.originalURL)
-				if tt.wantShortenError {
+				shortURL, err := svc.Shorten(ctx, tt.originalURL)
+				if tt.expectShortenError {
 					assert.Error(t, err)
 				} else {
 					assert.NoError(t, err)
@@ -126,14 +149,14 @@ func TestShorterenerService(t *testing.T) {
 
 				result, err := svc.Resolve(shortURL)
 
-				if tt.wantResolveError {
+				if tt.expectResolveError {
 					assert.Error(t, err)
 				} else {
 					assert.NoError(t, err)
 				}
 
-				if tt.wantResolveErrorIs != nil {
-					assert.ErrorIs(t, err, tt.wantResolveErrorIs)
+				if tt.wantResolveError != nil {
+					assert.ErrorIs(t, err, tt.wantResolveError)
 				}
 
 				if tt.wantResolvedURL != "" {
