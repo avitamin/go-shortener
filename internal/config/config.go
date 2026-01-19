@@ -21,6 +21,8 @@ type Config struct {
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	DatabaseDsn     string `env:"DATABASE_DSN"`
 	SecretKey       string `env:"SECRET_KEY"`
+	AuditFile       string `env:"AUDIT_FILE"`
+	AuditURL        string `env:"AUDIT_URL"`
 }
 
 func New(withParse bool) (*Config, error) {
@@ -30,6 +32,8 @@ func New(withParse bool) (*Config, error) {
 	flag.StringVar(&cfg.BaseURL, "b", DefaultBaseURL, "базовый URL (например http://localhost:8080)")
 	flag.StringVar(&cfg.FileStoragePath, "f", DefaultFileStoragePath, "путь к файлу хранилища (например ./runtime/storage)")
 	flag.StringVar(&cfg.DatabaseDsn, "d", "", "DSN (например postgres://postgres:postgres@db:5432/postgres)")
+	flag.StringVar(&cfg.AuditFile, "audit-file", "", "путь к файлу для логов аудита")
+	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL удаленного сервера для логов аудита")
 
 	if withParse {
 		flag.Parse()
