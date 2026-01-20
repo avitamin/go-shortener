@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -23,6 +24,7 @@ type ShortenerService struct {
 	repo           repository.Repository
 	Config         *config.Config
 	deleteUserURLs chan DeleteUserURLs
+	Audit          *audit.Service
 }
 
 type DeleteUserURLs struct {
@@ -31,10 +33,26 @@ type DeleteUserURLs struct {
 }
 
 func NewShortenerService(repo repository.Repository, config *config.Config) *ShortenerService {
+	// Инициализация сервиса аудита
+	auditService := audit.NewService()
+
+	// Добавляем FileObserver, если указан путь к файлу
+	if config.AuditFile != "" {
+		fileObserver := audit.NewFileObserver(config.AuditFile)
+		auditService.AddObserver(fileObserver)
+	}
+
+	// Добавляем RemoteObserver, если указан URL
+	if config.AuditURL != "" {
+		remoteObserver := audit.NewRemoteObserver(config.AuditURL)
+		auditService.AddObserver(remoteObserver)
+	}
+
 	instance := &ShortenerService{
 		repo:           repo,
 		Config:         config,
 		deleteUserURLs: make(chan DeleteUserURLs, 10),
+		Audit:          auditService,
 	}
 
 	instance.initDeleteWorkers()
