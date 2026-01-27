@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"log"
 	"sync"
 
 	"github.com/avitamin/go-shortener/internal/model"
@@ -59,12 +58,7 @@ func (r *inMemoryStorage) GetShort(ctx context.Context, orig string) (short stri
 	defer r.mu.Unlock()
 
 	short, ok = r.shortByOrig[orig]
-	if ok {
-		log.Println("найдена запись ", orig, "->", short)
-		return short, true
-	}
-
-	return "", false
+	return short, ok
 }
 
 func (r *inMemoryStorage) saveNoLock(url model.URL) error {
@@ -74,8 +68,6 @@ func (r *inMemoryStorage) saveNoLock(url model.URL) error {
 	if url.DeletedFlag {
 		r.deletedByShort[url.Short] = true
 	}
-
-	log.Println("сохранена запись ", url.Original, "->", url.Short)
 
 	return nil
 }

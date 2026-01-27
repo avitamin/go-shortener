@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -72,7 +73,13 @@ func (s *ShortenerService) Shorten(ctx context.Context, orig string) (string, er
 }
 
 func (s *ShortenerService) GetAbsoluteShortURL(short string) string {
-	return s.Config.BaseURL + "/" + short
+	// Используем strings.Builder для более эффективной конкатенации
+	var builder strings.Builder
+	builder.Grow(len(s.Config.BaseURL) + 1 + len(short))
+	builder.WriteString(s.Config.BaseURL)
+	builder.WriteByte('/')
+	builder.WriteString(short)
+	return builder.String()
 }
 
 func (s *ShortenerService) createModel(ctx context.Context, orig string) (string, model.URL) {
@@ -281,8 +288,20 @@ func (s *ShortenerService) flushDeleteUserURLs(userID string, shortURLs []string
 	return nil
 }
 
+// Пул для повторного использования буферов байтов
+var bytePool = sync.Pool{
+	New: func() interface{} {
+		b := make([]byte, 6)
+		return &b
+	},
+}
+
 func generateID() string {
-	b := make([]byte, 6)
+	// Получаем буфер из пула
+	bp := bytePool.Get().(*[]byte)
+	b := *bp
+	defer bytePool.Put(bp)
+
 	io.ReadFull(rand.Reader, b)
 
 	return base64.URLEncoding.EncodeToString(b)

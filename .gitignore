@@ -22,3 +22,16 @@ vendor/
 # IDEs directories
 .idea
 .vscode
+
+# Profiling files
+# *.pprof
+# *.prof
+# cpu.prof
+# mem.prof
+# profiles/*.pprof
+
+# Benchmark results
+bench-*.txt
+
+# Utility scripts (keep in repo for convenience)
+# check_optimization.sh
