@@ -25,12 +25,12 @@ const deleteUserURLsWorkersCoount = 5
 
 // ShortenerService — основной сервис для работы с сокращенными URL.
 type ShortenerService struct {
-	repo           repository.Repository
+	repo repository.Repository
 	// Config содержит конфигурацию сервиса.
 	Config         *config.Config
 	deleteUserURLs chan DeleteUserURLs
 	// Audit — сервис аудита для логирования операций.
-	Audit          *audit.Service
+	Audit *audit.Service
 }
 
 // DeleteUserURLs представляет запрос на удаление URL пользователя.
@@ -38,7 +38,7 @@ type DeleteUserURLs struct {
 	// ShortURLs — список коротких идентификаторов для удаления.
 	ShortURLs []string
 	// UserID — идентификатор пользователя.
-	UserID    string
+	UserID string
 }
 
 // NewShortenerService создает новый экземпляр ShortenerService с указанным репозиторием и конфигурацией.
