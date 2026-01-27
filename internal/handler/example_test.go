@@ -174,7 +174,9 @@ func Example_getUserURLs() {
 	router.ServeHTTP(w1, req1)
 
 	// Получаем cookie из первого ответа
-	cookies := w1.Result().Cookies()
+	resp1 := w1.Result()
+	defer resp1.Body.Close()
+	cookies := resp1.Cookies()
 
 	// Создаем второй URL с тем же пользователем
 	req2 := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString("https://example.com/url2"))
@@ -184,6 +186,8 @@ func Example_getUserURLs() {
 	}
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
+	resp2 := w2.Result()
+	defer resp2.Body.Close()
 
 	// Получаем список URL пользователя с той же cookie
 	req := httptest.NewRequest(http.MethodGet, "/api/user/urls", nil)
