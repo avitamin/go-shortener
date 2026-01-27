@@ -15,6 +15,9 @@ type inMemoryStorage struct {
 	deletedByShort map[string]bool
 }
 
+// NewInMemoryStorage создает новый in-memory репозиторий для хранения URL в памяти.
+// Данные не сохраняются после перезапуска приложения.
+// Рекомендуется для тестирования и разработки.
 func NewInMemoryStorage() *inMemoryStorage {
 	return &inMemoryStorage{
 		origByShort:    make(map[string]string),
@@ -24,6 +27,9 @@ func NewInMemoryStorage() *inMemoryStorage {
 	}
 }
 
+// Find находит URL по короткому идентификатору.
+// Возвращает ErrNotFound, если URL не найден.
+// Возвращает ErrIsDeleted, если URL помечен как удаленный.
 func (r *inMemoryStorage) Find(short string) (model.URL, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -40,6 +46,7 @@ func (r *inMemoryStorage) Find(short string) (model.URL, error) {
 	return model.URL{Short: short, Original: orig}, nil
 }
 
+// Save сохраняет URL в памяти с блокировкой для потокобезопасности.
 func (r *inMemoryStorage) Save(ctx context.Context, url model.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -47,6 +54,8 @@ func (r *inMemoryStorage) Save(ctx context.Context, url model.URL) error {
 	return r.saveNoLock(url)
 }
 
+// GetShort проверяет существование короткого идентификатора для исходного URL.
+// Возвращает короткий идентификатор и true, если найден.
 func (r *inMemoryStorage) GetShort(ctx context.Context, orig string) (short string, ok bool) {
 	select {
 	case <-ctx.Done():
@@ -72,6 +81,7 @@ func (r *inMemoryStorage) saveNoLock(url model.URL) error {
 	return nil
 }
 
+// SaveBatch сохраняет пакет URL в памяти с блокировкой для потокобезопасности.
 func (r *inMemoryStorage) SaveBatch(ctx context.Context, urls []model.URL) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -84,6 +94,8 @@ func (r *inMemoryStorage) SaveBatch(ctx context.Context, urls []model.URL) error
 	return nil
 }
 
+// SaveBatchNoLock сохраняет пакет URL в памяти без блокировки.
+// ВАЖНО: должна вызываться только внутри уже заблокированной критической секции.
 func (r *inMemoryStorage) SaveBatchNoLock(ctx context.Context, urls []model.URL) error {
 	for _, u := range urls {
 		select {
@@ -99,14 +111,18 @@ func (r *inMemoryStorage) SaveBatchNoLock(ctx context.Context, urls []model.URL)
 	return nil
 }
 
+// Close закрывает хранилище. Для in-memory хранилища не требуется закрытие.
 func (r *inMemoryStorage) Close() error {
 	return nil
 }
 
+// PingContext возвращает ошибку, так как in-memory хранилище не имеет внешних зависимостей для проверки.
 func (r *inMemoryStorage) PingContext(ctx context.Context) error {
 	return ErrDBNotConfigured
 }
 
+// GetAll возвращает все URL из хранилища.
+// Используется для отладки и тестирования.
 func (r *inMemoryStorage) GetAll() []model.URL {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -122,6 +138,7 @@ func (r *inMemoryStorage) GetAll() []model.URL {
 
 }
 
+// GetUserURLs возвращает пустой список, так как in-memory хранилище не отслеживает привязку URL к пользователям.
 func (r *inMemoryStorage) GetUserURLs(ctx context.Context) ([]model.URL, error) {
 	result := make([]model.URL, 0)
 
@@ -131,6 +148,8 @@ func (r *inMemoryStorage) GetUserURLs(ctx context.Context) ([]model.URL, error) 
 	return result, nil
 }
 
+// DeleteUserURLs помечает URL пользователя как удаленные.
+// Проверяет принадлежность URL пользователю перед удалением.
 func (r *inMemoryStorage) DeleteUserURLs(ctx context.Context, userID string, shortens []string) error {
 	select {
 	case <-ctx.Done():

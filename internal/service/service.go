@@ -1,3 +1,4 @@
+// Package service содержит бизнес-логику сервиса сокращения URL.
 package service
 
 import (
@@ -17,22 +18,32 @@ import (
 	"github.com/avitamin/go-shortener/internal/repository"
 )
 
+// ErrNoUserIDInContext возвращается, когда в контексте отсутствует идентификатор пользователя.
 var ErrNoUserIDInContext = errors.New("no user ID in context")
 
 const deleteUserURLsWorkersCoount = 5
 
+// ShortenerService — основной сервис для работы с сокращенными URL.
 type ShortenerService struct {
 	repo           repository.Repository
+	// Config содержит конфигурацию сервиса.
 	Config         *config.Config
 	deleteUserURLs chan DeleteUserURLs
+	// Audit — сервис аудита для логирования операций.
 	Audit          *audit.Service
 }
 
+// DeleteUserURLs представляет запрос на удаление URL пользователя.
 type DeleteUserURLs struct {
+	// ShortURLs — список коротких идентификаторов для удаления.
 	ShortURLs []string
+	// UserID — идентификатор пользователя.
 	UserID    string
 }
 
+// NewShortenerService создает новый экземпляр ShortenerService с указанным репозиторием и конфигурацией.
+// Инициализирует сервис аудита на основе параметров конфигурации (AuditFile, AuditURL)
+// и запускает фоновые воркеры для обработки удаления URL.
 func NewShortenerService(repo repository.Repository, config *config.Config) *ShortenerService {
 	// Инициализация сервиса аудита
 	auditService := audit.NewService()
@@ -61,6 +72,9 @@ func NewShortenerService(repo repository.Repository, config *config.Config) *Sho
 	return instance
 }
 
+// Shorten создает короткую ссылку для указанного исходного URL.
+// Возвращает полный URL короткой ссылки (базовый адрес + короткий идентификатор).
+// В случае ошибки сохранения возвращает пустую строку и ошибку.
 func (s *ShortenerService) Shorten(ctx context.Context, orig string) (string, error) {
 
 	short, url := s.createModel(ctx, orig)
@@ -72,6 +86,8 @@ func (s *ShortenerService) Shorten(ctx context.Context, orig string) (string, er
 	return s.GetAbsoluteShortURL(short), nil
 }
 
+// GetAbsoluteShortURL формирует полный URL короткой ссылки из короткого идентификатора.
+// Использует strings.Builder для эффективной конкатенации строк.
 func (s *ShortenerService) GetAbsoluteShortURL(short string) string {
 	// Используем strings.Builder для более эффективной конкатенации
 	var builder strings.Builder
@@ -99,6 +115,9 @@ func (s *ShortenerService) createModel(ctx context.Context, orig string) (string
 	return short, model
 }
 
+// Resolve получает исходный URL по короткому идентификатору.
+// Возвращает исходный URL и nil в случае успеха.
+// Возвращает пустую строку и ошибку, если URL не найден или помечен как удаленный.
 func (s *ShortenerService) Resolve(id string) (string, error) {
 	url, err := s.repo.Find(id)
 	if err != nil {
@@ -109,6 +128,8 @@ func (s *ShortenerService) Resolve(id string) (string, error) {
 
 }
 
+// PingContext проверяет доступность хранилища данных.
+// Используется для проверки работоспособности сервиса (health check).
 func (s *ShortenerService) PingContext(ctx context.Context) error {
 
 	if err := s.repo.PingContext(ctx); err != nil {
@@ -118,6 +139,9 @@ func (s *ShortenerService) PingContext(ctx context.Context) error {
 	return nil
 }
 
+// GetShort проверяет, существует ли короткая ссылка для указанного исходного URL.
+// Возвращает полный URL короткой ссылки и true, если найдена.
+// Возвращает пустую строку и false, если не найдена.
 func (s *ShortenerService) GetShort(ctx context.Context, orig string) (string, bool) {
 	short, ok := s.repo.GetShort(ctx, orig)
 	if ok {
@@ -127,6 +151,10 @@ func (s *ShortenerService) GetShort(ctx context.Context, orig string) (string, b
 	return "", false
 }
 
+// ShortenBatch создает короткие ссылки для пакета исходных URL.
+// Возвращает массив полных URL коротких ссылок в том же порядке, что и входные URL.
+// Автоматически определяет дубликаты и не создает их повторно.
+// Возвращает ошибку, если пакет пустой или произошла ошибка при сохранении.
 func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string) ([]string, error) {
 	if len(originals) == 0 {
 		return nil, errors.New("empty batch")
@@ -176,7 +204,10 @@ func (s *ShortenerService) ShortenBatch(ctx context.Context, originals []string)
 	return result, nil
 }
 
-// GetUserURLs возвращает все URL, созданные пользователем с userId.
+// GetUserURLs возвращает все URL, созданные пользователем.
+// Извлекает идентификатор пользователя из контекста.
+// Возвращает список URL с полными адресами коротких ссылок.
+// Возвращает ErrNoUserIDInContext, если пользователь не аутентифицирован.
 func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error) {
 	var result []model.URL
 
@@ -201,7 +232,10 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error)
 
 }
 
-// DeleteUserURLs помечает на удаление URL, созданные пользователем с userId.
+// DeleteUserURLs помечает URL на удаление для текущего пользователя.
+// Удаление выполняется асинхронно через очередь воркеров.
+// Извлекает идентификатор пользователя из контекста.
+// Возвращает ErrNoUserIDInContext, если пользователь не аутентифицирован.
 func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []string) error {
 
 	select {
@@ -307,6 +341,9 @@ func generateID() string {
 	return base64.URLEncoding.EncodeToString(b)
 }
 
+// GetUserIDFromContext извлекает идентификатор пользователя из контекста.
+// Возвращает идентификатор и true, если найден.
+// Возвращает пустую строку и false, если не найден.
 func GetUserIDFromContext(ctx context.Context) (string, bool) {
 	userID, ok := ctx.Value(model.ContextUserID).(string)
 	return userID, ok

@@ -1,3 +1,4 @@
+// Package handler содержит HTTP-обработчики и маршрутизацию для сервиса сокращения URL.
 package handler
 
 import (
@@ -19,6 +20,18 @@ import (
 	"github.com/avitamin/go-shortener/internal/model"
 )
 
+// NewRouter создает и настраивает HTTP-маршрутизатор с обработчиками для всех эндпоинтов.
+//
+// Подключает middleware для логирования, аутентификации, сжатия и аудита.
+//
+// Доступные эндпоинты:
+//   - POST /                      - Создание короткой ссылки (text/plain)
+//   - GET /{id}                   - Редирект по короткой ссылке
+//   - POST /api/shorten           - Создание короткой ссылки (JSON)
+//   - POST /api/shorten/batch     - Пакетное создание коротких ссылок
+//   - GET /api/user/urls          - Получение всех ссылок пользователя
+//   - DELETE /api/user/urls       - Удаление ссылок пользователя
+//   - GET /ping                   - Проверка доступности сервиса
 func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 	log, err := logger.New()
 	if err != nil {
@@ -342,6 +355,7 @@ func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 	return rtr, nil
 }
 
+// ErrInvalidURL возвращается, когда URL не начинается с http:// или https://.
 var ErrInvalidURL = errors.New("некорректный url")
 
 func validateOriginalURL(orig string) error {

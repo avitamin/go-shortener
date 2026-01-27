@@ -1,3 +1,4 @@
+// Package middleware содержит HTTP middleware для обработки запросов.
 package middleware
 
 import (
@@ -17,10 +18,16 @@ import (
 
 const cookieName = "user_id"
 
+// ErrCookieMissingID возвращается, когда cookie не содержит идентификатор пользователя.
 var ErrCookieMissingID = errors.New("cookie missing user id")
+
+// ErrSecretKeyReq возвращается, когда секретный ключ для аутентификации пустой.
 var ErrSecretKeyReq = errors.New("auth secret is empty")
 
-// Auth возвращает middleware; secret не должен быть пустым.
+// Auth возвращает middleware для аутентификации пользователей через подписанные cookies.
+// Если cookie отсутствует или подпись невалидна, создается новый идентификатор пользователя.
+// Идентификатор пользователя сохраняется в контексте запроса.
+// Параметр secret используется для HMAC-подписи cookies и не должен быть пустым.
 func Auth(secret string, logger *zap.Logger) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

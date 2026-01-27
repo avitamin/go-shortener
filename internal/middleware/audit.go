@@ -16,11 +16,13 @@ type auditResponseWriter struct {
 	auditURL    string
 }
 
+// WriteHeader записывает HTTP статус код и сохраняет его для аудита.
 func (rw *auditResponseWriter) WriteHeader(code int) {
 	rw.statusCode = code
 	rw.ResponseWriter.WriteHeader(code)
 }
 
+// Write записывает данные в ответ и устанавливает статус код 200, если он не был установлен ранее.
 func (rw *auditResponseWriter) Write(b []byte) (int, error) {
 	// Если WriteHeader не был вызван явно, по умолчанию 200
 	if rw.statusCode == 0 {
@@ -29,7 +31,8 @@ func (rw *auditResponseWriter) Write(b []byte) (int, error) {
 	return rw.ResponseWriter.Write(b)
 }
 
-// SetAuditData сохраняет данные для аудита в ResponseWriter
+// SetAuditData сохраняет данные для аудита в обернутом ResponseWriter.
+// Используется обработчиками для передачи информации о действии и URL в middleware аудита.
 func SetAuditData(w http.ResponseWriter, action, url string) {
 	if wrapper, ok := w.(*auditResponseWriter); ok {
 		wrapper.auditAction = action
@@ -37,7 +40,9 @@ func SetAuditData(w http.ResponseWriter, action, url string) {
 	}
 }
 
-// AuditMiddleware middleware для аудита запросов
+// AuditMiddleware возвращает middleware для аудита запросов.
+// Логирует успешные операции создания и перехода по коротким ссылкам.
+// Обработчики должны вызывать SetAuditData для передачи информации о действии.
 func AuditMiddleware(svc *service.ShortenerService, log *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

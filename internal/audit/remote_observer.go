@@ -13,6 +13,8 @@ type RemoteObserver struct {
 	client *http.Client
 }
 
+// NewRemoteObserver создает новый RemoteObserver для отправки событий аудита на удаленный сервер.
+// События отправляются HTTP POST запросом в формате JSON с таймаутом 5 секунд.
 func NewRemoteObserver(url string) *RemoteObserver {
 	return &RemoteObserver{
 		url: url,

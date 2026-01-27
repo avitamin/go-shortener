@@ -11,12 +11,17 @@ import (
 	"github.com/lib/pq"
 )
 
+// DataBaseRepository — реализация Repository с использованием PostgreSQL.
+// Использует комбинацию базы данных и in-memory кеша для оптимизации производительности.
 type DataBaseRepository struct {
 	mu      sync.Mutex
 	storage *inMemoryStorage
 	db      *sql.DB
 }
 
+// NewDataBaseRepository создает новый репозиторий с использованием PostgreSQL для хранения данных.
+// Загружает существующие URL из базы данных в память для быстрого доступа.
+// Возвращает ошибку, если не удается загрузить данные из БД.
 func NewDataBaseRepository(db *sql.DB) (Repository, error) {
 	r := &DataBaseRepository{
 		db:      db,
@@ -30,14 +35,21 @@ func NewDataBaseRepository(db *sql.DB) (Repository, error) {
 	return r, nil
 }
 
+// Find находит URL по короткому идентификатору в in-memory кеше.
+// Возвращает ErrNotFound, если URL не найден.
+// Возвращает ErrIsDeleted, если URL помечен как удаленный.
 func (r *DataBaseRepository) Find(short string) (model.URL, error) {
 	return r.storage.Find(short)
 }
 
+// GetShort проверяет существование короткого идентификатора для исходного URL в кеше.
+// Возвращает короткий идентификатор и true, если найден.
 func (r *DataBaseRepository) GetShort(ctx context.Context, orig string) (short string, ok bool) {
 	return r.storage.GetShort(ctx, orig)
 }
 
+// Save сохраняет URL в базу данных и обновляет in-memory кеш.
+// Сначала сохраняет в кеш, затем в базу данных.
 func (r *DataBaseRepository) Save(ctx context.Context, url model.URL) error {
 	err := r.storage.Save(ctx, url)
 	if err != nil {
@@ -53,6 +65,9 @@ func (r *DataBaseRepository) Save(ctx context.Context, url model.URL) error {
 
 }
 
+// SaveBatch сохраняет пакет URL в базу данных в рамках одной транзакции.
+// Атомарно обновляет как базу данных, так и in-memory кеш.
+// В случае ошибки откатывает всю транзакцию.
 func (r *DataBaseRepository) SaveBatch(ctx context.Context, urls []model.URL) error {
 	if len(urls) == 0 {
 		return nil
@@ -95,10 +110,13 @@ func (r *DataBaseRepository) SaveBatch(ctx context.Context, urls []model.URL) er
 	return nil
 }
 
+// Close закрывает соединение с базой данных.
+// В текущей реализации не выполняет действий, так как соединение управляется извне.
 func (r *DataBaseRepository) Close() error {
 	return nil
 }
 
+// PingContext проверяет доступность соединения с базой данных.
 func (r *DataBaseRepository) PingContext(ctx context.Context) error {
 	return r.db.PingContext(ctx)
 }
@@ -123,6 +141,8 @@ func (r *DataBaseRepository) queryUrls(ctx context.Context) error {
 	return rows.Err()
 }
 
+// GetUserURLs возвращает все URL, созданные пользователем из контекста.
+// Извлекает данные напрямую из базы данных.
 func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, error) {
 	result := make([]model.URL, 0)
 
@@ -155,6 +175,9 @@ func (r *DataBaseRepository) GetUserURLs(ctx context.Context) ([]model.URL, erro
 	return result, nil
 }
 
+// DeleteUserURLs помечает URL пользователя как удаленные в базе данных.
+// Обновляет флаг is_deleted для указанных коротких идентификаторов.
+// Также обновляет состояние in-memory кеша.
 func (r *DataBaseRepository) DeleteUserURLs(ctx context.Context, userID string, shortens []string) error {
 	select {
 	case <-ctx.Done():

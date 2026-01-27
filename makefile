@@ -1,5 +1,5 @@
 # Имя бинарника
-BINARY_NAME=main
+BINARY_NAME=bin/shortener
 
 # Цель по умолчанию
 .DEFAULT_GOAL := help
@@ -9,7 +9,8 @@ BINARY_NAME=main
 ## 🔧 Сборка Go бинарника локально
 build:
 	@echo "🛠️  Building Go binary..."
-	go build -o $(BINARY_NAME) .
+	@mkdir -p bin
+	go build -o $(BINARY_NAME) ./cmd/shortener
 
 ## 🚀 Запуск docker-compose
 up:

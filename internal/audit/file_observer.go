@@ -12,6 +12,8 @@ type FileObserver struct {
 	mu       sync.Mutex
 }
 
+// NewFileObserver создает новый FileObserver для записи событий аудита в файл.
+// События записываются в формате JSON (по одному событию на строку).
 func NewFileObserver(filePath string) *FileObserver {
 	return &FileObserver{
 		filePath: filePath,
