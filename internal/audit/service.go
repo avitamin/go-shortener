@@ -52,6 +52,14 @@ func (s *Service) Close() {
 		close(s.done)
 	})
 	s.wg.Wait()
+
+	for _, observer := range s.observers {
+		if closer, ok := observer.(interface{ Close() error }); ok {
+			if err := closer.Close(); err != nil {
+				log.Printf("Failed to close observer: %v", err)
+			}
+		}
+	}
 }
 
 func (s *Service) run() {
