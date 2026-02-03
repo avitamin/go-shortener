@@ -4,7 +4,6 @@ import (
 	"os"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestAuditService(t *testing.T) {
@@ -21,9 +20,8 @@ func TestAuditService(t *testing.T) {
 
 	// Логируем событие создания короткой ссылки
 	service.LogShorten("user123", "https://example.com")
-
-	// Даём время на асинхронную запись
-	time.Sleep(100 * time.Millisecond)
+	// Завершаем сервис и дожидаемся записи события
+	service.Close()
 
 	// Читаем файл и проверяем содержимое
 	data, err := os.ReadFile(tmpFile)
@@ -57,9 +55,8 @@ func TestAuditFollowEvent(t *testing.T) {
 
 	// Логируем событие прохождения по ссылке
 	service.LogFollow("user456", "https://example.org")
-
-	// Даём время на асинхронную запись
-	time.Sleep(100 * time.Millisecond)
+	// Завершаем сервис и дожидаемся записи события
+	service.Close()
 
 	// Читаем файл и проверяем содержимое
 	data, err := os.ReadFile(tmpFile)

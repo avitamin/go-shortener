@@ -2,19 +2,33 @@ package audit
 
 import (
 	"log"
+	"sync"
 	"time"
 )
+
+const defaultAuditQueueSize = 1024
 
 // Service сервис аудита, управляющий наблюдателями (Subject в паттерне Observer)
 type Service struct {
 	observers []Observer
+	events    chan Event
+	done      chan struct{}
+	closeOnce sync.Once
+	wg        sync.WaitGroup
 }
 
 // NewService создаёт новый сервис аудита
 func NewService() *Service {
-	return &Service{
+	svc := &Service{
 		observers: make([]Observer, 0),
+		events:    make(chan Event, defaultAuditQueueSize),
+		done:      make(chan struct{}),
 	}
+
+	svc.wg.Add(1)
+	go svc.run()
+
+	return svc
 }
 
 // AddObserver добавляет наблюдателя
@@ -24,14 +38,49 @@ func (s *Service) AddObserver(observer Observer) {
 
 // Notify отправляет событие всем наблюдателям
 func (s *Service) Notify(event Event) {
-	// Отправляем асинхронно, чтобы не блокировать основной поток
-	go func() {
-		for _, observer := range s.observers {
-			if err := observer.Notify(event); err != nil {
-				log.Printf("Failed to notify observer: %v", err)
+	// Очередь ограничена размером буфера; при заполнении будет блокироваться.
+	// При остановке сервиса не блокируемся и не принимаем новые события.
+	select {
+	case s.events <- event:
+	case <-s.done:
+	}
+}
+
+// Close завершает работу сервиса аудита и дожидается обработки очереди.
+func (s *Service) Close() {
+	s.closeOnce.Do(func() {
+		close(s.done)
+	})
+	s.wg.Wait()
+}
+
+func (s *Service) run() {
+	defer s.wg.Done()
+
+	for {
+		select {
+		case event := <-s.events:
+			for _, observer := range s.observers {
+				if err := observer.Notify(event); err != nil {
+					log.Printf("Failed to notify observer: %v", err)
+				}
+			}
+		case <-s.done:
+			// Дожидаемся обработки очереди и выходим.
+			for {
+				select {
+				case event := <-s.events:
+					for _, observer := range s.observers {
+						if err := observer.Notify(event); err != nil {
+							log.Printf("Failed to notify observer: %v", err)
+						}
+					}
+				default:
+					return
+				}
 			}
 		}
-	}()
+	}
 }
 
 // LogShorten логирует событие создания короткой ссылки

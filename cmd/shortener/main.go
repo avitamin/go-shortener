@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -69,7 +74,27 @@ func main() {
 
 	log.Printf("Запускаем сервер по адресу %s\n", cfg.Address)
 
-	if err := http.ListenAndServe(cfg.Address, rtr); err != nil {
-		log.Fatalf("server launching error: %v", err)
+	server := &http.Server{
+		Addr:    cfg.Address,
+		Handler: rtr,
 	}
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server launching error: %v", err)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
+
+	svc.Audit.Close()
 }
