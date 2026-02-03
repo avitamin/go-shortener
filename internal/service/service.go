@@ -41,25 +41,9 @@ type DeleteUserURLs struct {
 	UserID string
 }
 
-// NewShortenerService создает новый экземпляр ShortenerService с указанным репозиторием и конфигурацией.
-// Инициализирует сервис аудита на основе параметров конфигурации (AuditFile, AuditURL)
-// и запускает фоновые воркеры для обработки удаления URL.
-func NewShortenerService(repo repository.Repository, config *config.Config) *ShortenerService {
-	// Инициализация сервиса аудита
-	auditService := audit.NewService()
-
-	// Добавляем FileObserver, если указан путь к файлу
-	if config.AuditFile != "" {
-		fileObserver := audit.NewFileObserver(config.AuditFile)
-		auditService.AddObserver(fileObserver)
-	}
-
-	// Добавляем RemoteObserver, если указан URL
-	if config.AuditURL != "" {
-		remoteObserver := audit.NewRemoteObserver(config.AuditURL)
-		auditService.AddObserver(remoteObserver)
-	}
-
+// NewShortenerService создает новый экземпляр ShortenerService с указанным репозиторием,
+// конфигурацией и сервисом аудита, а также запускает фоновые воркеры для удаления URL.
+func NewShortenerService(repo repository.Repository, config *config.Config, auditService *audit.Service) *ShortenerService {
 	instance := &ShortenerService{
 		repo:           repo,
 		Config:         config,

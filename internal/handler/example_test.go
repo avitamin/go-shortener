@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -32,7 +33,7 @@ func Example_createShortURL() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	// Создание тестового запроса
@@ -62,7 +63,7 @@ func Example_createShortURLJSON() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	// Подготовка JSON запроса
@@ -95,7 +96,7 @@ func Example_batchCreateShortURLs() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	// Подготовка батч-запроса
@@ -133,7 +134,7 @@ func Example_redirectShortURL() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	// Сначала создаем короткую ссылку
@@ -164,7 +165,7 @@ func Example_getUserURLs() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	// Создаем несколько ссылок - используем POST запрос чтобы middleware установил cookie
@@ -218,7 +219,7 @@ func Example_deleteUserURLs() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	// Подготовка запроса на удаление
@@ -246,7 +247,7 @@ func Example_pingService() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, err := handler.NewRouter(svc)
 	if err != nil {
 		log.Fatal(err)
@@ -272,7 +273,7 @@ func Example_duplicateURL() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := handler.NewRouter(svc)
 
 	originalURL := "https://example.com/duplicate-test"

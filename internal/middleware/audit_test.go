@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/repository/mock"
 	"github.com/avitamin/go-shortener/internal/service"
@@ -33,7 +34,7 @@ func TestAuditMiddleware(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	repo := mock.NewMockRepository(ctrl)
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создаём logger
 	log, _ := zap.NewDevelopment()
@@ -94,7 +95,7 @@ func TestAuditMiddleware_NoAuditOnError(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	repo := mock.NewMockRepository(ctrl)
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создаём logger
 	log, _ := zap.NewDevelopment()

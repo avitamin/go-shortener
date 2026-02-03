@@ -16,6 +16,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -65,7 +66,7 @@ func main() {
 	}
 	defer repo.Close()
 
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {

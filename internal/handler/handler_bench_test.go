@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
@@ -72,7 +73,7 @@ func BenchmarkHandlerPostShorten(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router := newBenchRouter(svc)
 
 	b.ResetTimer()
@@ -92,7 +93,7 @@ func BenchmarkHandlerGetRedirect(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	// Предварительно создаем ссылки
@@ -122,7 +123,7 @@ func BenchmarkHandlerAPIShortenJSON(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	b.ResetTimer()
@@ -146,7 +147,7 @@ func BenchmarkHandlerBatchShorten(b *testing.B) {
 				BaseURL:   "http://localhost:8080",
 				SecretKey: "test-secret-key-32-bytes-long!!",
 			}
-			svc := service.NewShortenerService(repo, cfg)
+			svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 			router, _ := NewRouter(svc)
 
 			// Формируем JSON для батча
@@ -180,7 +181,7 @@ func BenchmarkHandlerPing(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	b.ResetTimer()
@@ -198,7 +199,7 @@ func BenchmarkHandlerConcurrentRequests(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	b.RunParallel(func(pb *testing.PB) {
@@ -221,7 +222,7 @@ func BenchmarkHandlerMixedOperations(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	// Предварительно создаем ссылки
@@ -263,7 +264,7 @@ func BenchmarkHandlerValidation(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	b.Run("ValidURL", func(b *testing.B) {
@@ -294,7 +295,7 @@ func BenchmarkHandlerJSONMarshalUnmarshal(b *testing.B) {
 		BaseURL:   "http://localhost:8080",
 		SecretKey: "test-secret-key-32-bytes-long!!",
 	}
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	router, _ := NewRouter(svc)
 
 	b.ReportAllocs()

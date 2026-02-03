@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -26,7 +27,7 @@ func Example_shorten() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создание короткой ссылки
 	ctx := context.Background()
@@ -47,7 +48,7 @@ func Example_shortenWithUser() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создание контекста с идентификатором пользователя
 	ctx := model.NewContextWithUser(context.Background(), "user123")
@@ -70,7 +71,7 @@ func Example_resolve() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создание короткой ссылки
 	ctx := context.Background()
@@ -98,7 +99,7 @@ func Example_shortenBatch() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Список URL для сокращения
 	originals := []string{
@@ -130,7 +131,7 @@ func Example_getUserURLs() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создание контекста с пользователем
 	ctx := model.NewContextWithUser(context.Background(), "user123")
@@ -158,7 +159,7 @@ func Example_deleteUserURLs() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Создание контекста с пользователем
 	ctx := model.NewContextWithUser(context.Background(), "user123")
@@ -189,7 +190,7 @@ func Example_getShort() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	ctx := context.Background()
 	originalURL := "https://example.com/check-duplicate"
@@ -215,7 +216,7 @@ func Example_pingContext() {
 	cfg := makeTestConfig()
 
 	repo := repository.NewInMemoryStorage()
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	// Проверка доступности
 	ctx := context.Background()

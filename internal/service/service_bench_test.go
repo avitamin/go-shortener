@@ -10,6 +10,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -35,7 +36,7 @@ func getBenchService() *ShortenerService {
 		benchConfig = &config.Config{
 			BaseURL: "http://localhost:8080",
 		}
-		benchService = NewShortenerService(benchRepo, benchConfig)
+		benchService = NewShortenerService(benchRepo, benchConfig, audit.NewServiceFromConfig(benchConfig))
 	})
 	return benchService
 }
@@ -125,7 +126,7 @@ func BenchmarkShortenBatch(b *testing.B) {
 			cfg := &config.Config{
 				BaseURL: "http://localhost:8080",
 			}
-			service := NewShortenerService(repo, cfg)
+			service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 			ctx := context.Background()
 
 			urls := make([]string, size)
@@ -147,7 +148,7 @@ func BenchmarkShortenBatchWithDuplicates(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	// Создаем батч с дубликатами (50% дубликатов)
@@ -168,7 +169,7 @@ func BenchmarkGetShort(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	// Предварительно создаем ссылки
@@ -188,7 +189,7 @@ func BenchmarkConcurrentShorten(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	b.ResetTimer()
@@ -207,7 +208,7 @@ func BenchmarkConcurrentResolve(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	// Предварительно создаем ссылки
@@ -233,7 +234,7 @@ func BenchmarkMixedOperations(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	// Предварительно создаем ссылки
@@ -264,7 +265,7 @@ func BenchmarkGetUserURLs(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.WithValue(context.Background(), model.ContextUserID, "user123")
 
 	// Создаем 100 ссылок для пользователя
@@ -284,7 +285,7 @@ func BenchmarkDeleteUserURLs(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.WithValue(context.Background(), model.ContextUserID, "user123")
 
 	// Создаем ссылки для пользователя
@@ -308,7 +309,7 @@ func BenchmarkCreateModel(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.WithValue(context.Background(), model.ContextUserID, "user123")
 
 	b.ResetTimer()
@@ -323,7 +324,7 @@ func BenchmarkGetAbsoluteShortURL(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -337,7 +338,7 @@ func BenchmarkHighContentionScenario(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	// Создаем небольшой набор популярных URL для высокой конкуренции
@@ -379,7 +380,7 @@ func BenchmarkMemoryAllocation(b *testing.B) {
 	cfg := &config.Config{
 		BaseURL: "http://localhost:8080",
 	}
-	service := NewShortenerService(repo, cfg)
+	service := NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 	ctx := context.Background()
 
 	b.ReportAllocs()

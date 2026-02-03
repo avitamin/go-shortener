@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
@@ -105,7 +106,7 @@ func TestShorterenerService(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg.BaseURL = tt.baseURL
-			svc := service.NewShortenerService(repo, cfg)
+			svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 			// Добавляем userId в контекст
 			ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
