@@ -32,7 +32,9 @@ func TestAuth_NoCookieCreatesSignedCookie(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
 	}
-	cookies := w.Result().Cookies()
+	resp := w.Result()
+	defer resp.Body.Close()
+	cookies := resp.Cookies()
 	if len(cookies) == 0 {
 		t.Fatal("expected signed cookie")
 	}
@@ -98,7 +100,9 @@ func TestAuth_InvalidSignatureIssuesNewCookie(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("unexpected status: %d", w.Code)
 	}
-	if len(w.Result().Cookies()) == 0 {
+	resp := w.Result()
+	defer resp.Body.Close()
+	if len(resp.Cookies()) == 0 {
 		t.Fatal("expected new cookie")
 	}
 }
