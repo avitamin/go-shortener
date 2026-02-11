@@ -12,6 +12,11 @@ build:
 	@mkdir -p bin
 	go build -o $(BINARY_NAME) ./cmd/shortener
 
+## 🔍 Запуск project multichecker
+lint:
+	@echo "🔍 Running staticlint multichecker..."
+	@go run ./cmd/staticlint ./...
+
 ## 🚀 Запуск docker-compose
 up:
 	@echo "🚀 Starting Docker containers..."

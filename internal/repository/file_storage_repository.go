@@ -138,25 +138,20 @@ func (r *fileStorageRepositoy) loadFromFile() error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	dec := json.NewDecoder(r.file)
+	if _, err := r.file.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
 
-	for {
+	scanner := bufio.NewScanner(r.file)
+	for scanner.Scan() {
 		var u model.URL
-		if err := dec.Decode(&u); err != nil {
-			if errors.Is(err, os.ErrInvalid) {
-				// Битая строка в файле, пропускаем
-				break
-			}
-			if errors.Is(err, io.EOF) {
-				// Пустой файл или достигнут конец файла
-				break
-			}
-			// пропускаем битые строки
+		if err := json.Unmarshal(scanner.Bytes(), &u); err != nil {
+			// Пропускаем битые строки и продолжаем чтение.
 			continue
 		}
 		r.storage.Save(context.Background(), u)
 	}
-	return nil
+	return scanner.Err()
 }
 
 // GetUserURLs возвращает пустой список, так как файловое хранилище не поддерживает привязку к пользователям.
