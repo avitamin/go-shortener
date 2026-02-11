@@ -1,3 +1,4 @@
+// Package handler содержит HTTP-обработчики и маршрутизацию для сервиса сокращения URL.
 package handler
 
 import (
@@ -19,7 +20,19 @@ import (
 	"github.com/avitamin/go-shortener/internal/model"
 )
 
-func NewRouter(service *service.ShortenerService) (http.Handler, error) {
+// NewRouter создает и настраивает HTTP-маршрутизатор с обработчиками для всех эндпоинтов.
+//
+// Подключает middleware для логирования, аутентификации, сжатия и аудита.
+//
+// Доступные эндпоинты:
+//   - POST /                      - Создание короткой ссылки (text/plain)
+//   - GET /{id}                   - Редирект по короткой ссылке
+//   - POST /api/shorten           - Создание короткой ссылки (JSON)
+//   - POST /api/shorten/batch     - Пакетное создание коротких ссылок
+//   - GET /api/user/urls          - Получение всех ссылок пользователя
+//   - DELETE /api/user/urls       - Удаление ссылок пользователя
+//   - GET /ping                   - Проверка доступности сервиса
+func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 	log, err := logger.New()
 	if err != nil {
 		return nil, err
@@ -34,7 +47,8 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	rtr.Use(lclmw.ZapLogger(log))
 	rtr.Use(lclmw.GzipRequest(log))
 	rtr.Use(lclmw.GzipResponse)
-	rtr.Use(lclmw.Auth(service.Config.SecretKey, log))
+	rtr.Use(lclmw.Auth(svc.Config.SecretKey, log))
+	rtr.Use(lclmw.AuditMiddleware(svc, log))
 
 	rtr.Post("/", func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Content-Type") != "text/plain" {
@@ -53,7 +67,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		defer r.Body.Close()
 
 		orig := strings.TrimSpace(string(body))
-		short, ok := service.GetShort(r.Context(), orig)
+		short, ok := svc.GetShort(r.Context(), orig)
 		if ok {
 			statusCode = http.StatusConflict
 		} else {
@@ -65,7 +79,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 
 			statusCode = http.StatusCreated
 
-			short, err = service.Shorten(r.Context(), orig)
+			short, err = svc.Shorten(r.Context(), orig)
 			if err != nil {
 				log.Error(err.Error())
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -77,6 +91,9 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(statusCode)
 
 		w.Write([]byte(short))
+
+		// Сохраняем данные для аудита
+		lclmw.SetAuditData(w, "shorten", orig)
 	})
 
 	rtr.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +102,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			http.Error(w, "Пустой ID", http.StatusBadRequest)
 		}
 
-		original, err := service.Resolve(id)
+		original, err := svc.Resolve(id)
 		if err != nil {
 			log.Error(err.Error())
 
@@ -104,6 +121,9 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 
 		w.Header().Set("Location", original)
 		w.WriteHeader(http.StatusTemporaryRedirect)
+
+		// Сохраняем данные для аудита
+		lclmw.SetAuditData(w, "follow", original)
 	})
 
 	rtr.Post("/api/shorten", func(w http.ResponseWriter, r *http.Request) {
@@ -128,7 +148,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		}
 
 		orig := strings.TrimSpace(req.URL)
-		short, ok := service.GetShort(r.Context(), orig)
+		short, ok := svc.GetShort(r.Context(), orig)
 		if ok {
 			statusCode = http.StatusConflict
 		} else {
@@ -139,7 +159,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			}
 
 			statusCode = http.StatusCreated
-			short, err = service.Shorten(r.Context(), orig)
+			short, err = svc.Shorten(r.Context(), orig)
 			if err != nil {
 				log.Error(err.Error())
 				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -159,6 +179,9 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(statusCode)
 
 		w.Write(respBytes)
+
+		// Сохраняем данные для аудита
+		lclmw.SetAuditData(w, "shorten", orig)
 	})
 
 	rtr.Post("/api/shorten/batch", func(w http.ResponseWriter, r *http.Request) {
@@ -213,7 +236,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 
-		shorts, err := service.ShortenBatch(ctx, originals)
+		shorts, err := svc.ShortenBatch(ctx, originals)
 		if err != nil {
 			log.Error(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -267,7 +290,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 			return
 		}
 
-		err = service.DeleteUserURLs(r.Context(), req)
+		err = svc.DeleteUserURLs(r.Context(), req)
 		if err != nil {
 			log.Error(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -283,7 +306,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
 
-		urls, err := service.GetUserURLs(ctx)
+		urls, err := svc.GetUserURLs(ctx)
 		if err != nil {
 			log.Error(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
@@ -320,7 +343,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 		ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
 		defer cancel()
 
-		if err := service.PingContext(ctx); err != nil {
+		if err := svc.PingContext(ctx); err != nil {
 			log.Error(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 			return
@@ -332,6 +355,7 @@ func NewRouter(service *service.ShortenerService) (http.Handler, error) {
 	return rtr, nil
 }
 
+// ErrInvalidURL возвращается, когда URL не начинается с http:// или https://.
 var ErrInvalidURL = errors.New("некорректный url")
 
 func validateOriginalURL(orig string) error {

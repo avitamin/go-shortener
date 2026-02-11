@@ -8,7 +8,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// ZapLogger — middleware для логирования HTTP-запросов через zap.
+// ZapLogger возвращает middleware для логирования HTTP-запросов через zap.
+// Логирует метод, URI, статус код, размер ответа и длительность обработки запроса.
 func ZapLogger(logger *zap.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

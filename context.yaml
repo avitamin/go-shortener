@@ -1,0 +1,46 @@
+$schema: 'https://raw.githubusercontent.com/context-hub/generator/refs/heads/main/json-schema.json'
+documents:
+  -
+    description: 'Generic Go project template - Project Structure'
+    outputPath: docs/go-structure.md
+    overwrite: true
+    sources:
+      -
+        type: tree
+        description: 'go Directory Structure'
+        sourcePaths:
+          - api
+          - cmd
+          - internal
+          - pkg
+        filePattern: '*'
+        renderFormat: ascii
+        enabled: true
+        showCharCount: true
+        maxDepth: 3
+  -
+    description: 'Go Packages and Modules'
+    outputPath: docs/go-packages.md
+    overwrite: true
+    sources:
+      -
+        type: file
+        description: 'Go Packages and Modules'
+        sourcePaths:
+          - api
+          - cmd
+          - internal
+          - pkg
+        filePattern:
+          - '*.go'
+        notPath:
+          - vendor
+          - bin
+        treeView:
+          enabled: true
+          showSize: false
+          showLastModified: false
+          showCharCount: false
+    tags:
+      - go
+      - packages

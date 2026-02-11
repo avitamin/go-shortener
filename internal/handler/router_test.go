@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/handler"
 	"github.com/avitamin/go-shortener/internal/model"
@@ -65,7 +66,7 @@ func setupRepository(t *testing.T, repoType string) (repo repository.Repository,
 func setupService(t *testing.T, repo repository.Repository) *service.ShortenerService {
 	t.Helper()
 
-	svc := service.NewShortenerService(repo, cfg)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	return svc
 }

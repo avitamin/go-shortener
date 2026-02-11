@@ -1,0 +1,26 @@
+File: service.test
+Build ID: 655482b8a269dd42724ed50a3cf4338097c1ce73
+Type: alloc_space
+Time: 2026-01-27 18:22:02 +04
+Showing nodes accounting for -105.79MB, 5.68% of 1862.53MB total
+Dropped 22 nodes (cum <= 9.31MB)
+      flat  flat%   sum%        cum   cum%
+ -109.50MB  5.88%  5.88%    -2.50MB  0.13%  github.com/avitamin/go-shortener/internal/service.(*ShortenerService).GetAbsoluteShortURL
+     107MB  5.75%  0.13%      107MB  5.75%  strings.(*Builder).grow
+  -80.29MB  4.31%  4.45%   -80.29MB  4.31%  github.com/avitamin/go-shortener/internal/repository.(*inMemoryStorage).saveNoLock
+  -30.50MB  1.64%  6.08%   -18.50MB  0.99%  github.com/avitamin/go-shortener/internal/service.generateID
+      12MB  0.64%  5.44%       12MB  0.64%  encoding/base64.(*Encoding).EncodeToString
+  -11.50MB  0.62%  6.06%  -104.29MB  5.60%  github.com/avitamin/go-shortener/internal/service.BenchmarkShorten
+       8MB  0.43%  5.63%     8.50MB  0.46%  fmt.Sprintf
+      -1MB 0.054%  5.68%       -1MB 0.054%  runtime.allocm
+         0     0%  5.68%   -80.29MB  4.31%  github.com/avitamin/go-shortener/internal/repository.(*inMemoryStorage).Save
+         0     0%  5.68%  -101.29MB  5.44%  github.com/avitamin/go-shortener/internal/service.(*ShortenerService).Shorten
+         0     0%  5.68%   -18.50MB  0.99%  github.com/avitamin/go-shortener/internal/service.(*ShortenerService).createModel
+         0     0%  5.68%       -1MB 0.054%  runtime.newm
+         0     0%  5.68%       -1MB 0.054%  runtime.resetspinning
+         0     0%  5.68%       -1MB 0.054%  runtime.schedule
+         0     0%  5.68%       -1MB 0.054%  runtime.startm
+         0     0%  5.68%       -1MB 0.054%  runtime.wakep
+         0     0%  5.68%      107MB  5.75%  strings.(*Builder).Grow
+         0     0%  5.68%  -104.29MB  5.60%  testing.(*B).launch
+         0     0%  5.68%  -104.29MB  5.60%  testing.(*B).runN

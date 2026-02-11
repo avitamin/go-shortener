@@ -25,15 +25,19 @@ func TestConfig(t *testing.T) {
 		wantFileStoragePath string
 		wantDatabaseDsn     string
 		wantSecretKey       string
+		wantAuditFile       string
+		wantAuditURL        string
 	}{
 		{
 			name:                "defaults only",
-			wantError:           config.ErrSecretKeyReq,
 			args:                []string{"cmd"},
 			wantAddress:         "localhost:8080",
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
-			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/postgres?sslmode=disable",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
 		}, {
 			name: "defaults with secret key from env",
 			args: []string{"cmd"},
@@ -43,8 +47,10 @@ func TestConfig(t *testing.T) {
 			wantAddress:         "localhost:8080",
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
-			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/postgres?sslmode=disable",
+			wantDatabaseDsn:     "",
 			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
 		},
 		{
 			name: "flags override defaults",
@@ -57,6 +63,8 @@ func TestConfig(t *testing.T) {
 			wantFileStoragePath: "./runtime/new-storage",
 			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/new_db",
 			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
 		},
 		{
 			name: "env override defaults",
@@ -73,6 +81,8 @@ func TestConfig(t *testing.T) {
 			wantFileStoragePath: "./runtime/new-storage",
 			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
 			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
 		},
 		{
 			name: "env overrides flags",
@@ -89,6 +99,54 @@ func TestConfig(t *testing.T) {
 			wantFileStoragePath: "./runtime/env_storage",
 			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
 			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+		},
+		{
+			name: "audit flags set",
+			args: []string{"cmd", "--audit-file=/var/log/audit.log", "--audit-url=http://audit-server:8080"},
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+			wantAddress:         "localhost:8080",
+			wantBaseURL:         "http://localhost:8080",
+			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "/var/log/audit.log",
+			wantAuditURL:        "http://audit-server:8080",
+		},
+		{
+			name: "audit env set",
+			args: []string{"cmd"},
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+				"AUDIT_FILE": "/var/log/audit_env.log",
+				"AUDIT_URL":  "http://audit-env-server:8080",
+			},
+			wantAddress:         "localhost:8080",
+			wantBaseURL:         "http://localhost:8080",
+			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "/var/log/audit_env.log",
+			wantAuditURL:        "http://audit-env-server:8080",
+		},
+		{
+			name: "audit env overrides flags",
+			args: []string{"cmd", "--audit-file=/var/log/flag_audit.log", "--audit-url=http://flag-audit-server:8080"},
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+				"AUDIT_FILE": "/var/log/env_audit.log",
+				"AUDIT_URL":  "http://env-audit-server:8080",
+			},
+			wantAddress:         "localhost:8080",
+			wantBaseURL:         "http://localhost:8080",
+			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "/var/log/env_audit.log",
+			wantAuditURL:        "http://env-audit-server:8080",
 		},
 	}
 
@@ -104,21 +162,19 @@ func TestConfig(t *testing.T) {
 			defer ClearFlags()
 
 			cfg, err := config.New(true)
-			if err != nil {
-				if tt.wantError != nil {
-					assert.ErrorIs(t, err, tt.wantError)
-					return
-				} else {
-					t.Fatal(err)
-				}
+			if tt.wantError != nil {
+				assert.ErrorIs(t, err, tt.wantError)
+				return
 			}
 
-			if cfg.Address != tt.wantAddress {
-				t.Errorf("Address = %s, want %s", cfg.Address, tt.wantAddress)
-			}
-			if cfg.BaseURL != tt.wantBaseURL {
-				t.Errorf("BaseURL = %s, want %s", cfg.BaseURL, tt.wantBaseURL)
-			}
+			assert.NoError(t, err)
+			assert.Equal(t, tt.wantAddress, cfg.Address)
+			assert.Equal(t, tt.wantBaseURL, cfg.BaseURL)
+			assert.Equal(t, tt.wantFileStoragePath, cfg.FileStoragePath)
+			assert.Equal(t, tt.wantDatabaseDsn, cfg.DatabaseDsn)
+			assert.Equal(t, tt.wantSecretKey, cfg.SecretKey)
+			assert.Equal(t, tt.wantAuditFile, cfg.AuditFile)
+			assert.Equal(t, tt.wantAuditURL, cfg.AuditURL)
 		})
 	}
 }
