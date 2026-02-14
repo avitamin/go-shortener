@@ -1,5 +1,9 @@
 # Имя бинарника
 BINARY_NAME=bin/shortener
+BUILD_VERSION?=dev
+BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+BUILD_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+LDFLAGS=-X 'main.buildVersion=$(BUILD_VERSION)' -X 'main.buildDate=$(BUILD_DATE)' -X 'main.buildCommit=$(BUILD_COMMIT)'
 
 # Цель по умолчанию
 .DEFAULT_GOAL := help
@@ -10,7 +14,7 @@ BINARY_NAME=bin/shortener
 build:
 	@echo "🛠️  Building Go binary..."
 	@mkdir -p bin
-	go build -o $(BINARY_NAME) ./cmd/shortener
+	go build -ldflags="$(LDFLAGS)" -o $(BINARY_NAME) ./cmd/shortener
 
 ## 🔍 Запуск project multichecker
 lint:
@@ -41,7 +45,7 @@ psql:
 	@docker exec -it postgres_db psql -U postgres -d shortener
 
 go-run:
-	@go run ./cmd/shortener/main.go -a=localhost:8099 -b=http://localhost:8099/ -d=postgres://postgres:postgres@localhost:54323/shortener?sslmode=disable
+	@go run -ldflags="$(LDFLAGS)" ./cmd/shortener/main.go -a=localhost:8099 -b=http://localhost:8099/ -d=postgres://postgres:postgres@localhost:54323/shortener?sslmode=disable
 
 ## 📊 Запуск всех бенчмарков
 bench:
