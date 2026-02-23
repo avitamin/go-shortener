@@ -1,6 +1,9 @@
 package pool
 
-import "sync"
+import (
+	"errors"
+	"sync"
+)
 
 // Resettable описывает типы, которые умеют сбрасывать своё состояние.
 type Resettable interface {
@@ -12,10 +15,12 @@ type Pool[T Resettable] struct {
 	p sync.Pool
 }
 
+var ErrNilNewFn = errors.New("pool: new function is nil")
+
 // New создает пул объектов типа T.
-func New[T Resettable](newFn func() T) *Pool[T] {
+func New[T Resettable](newFn func() T) (*Pool[T], error) {
 	if newFn == nil {
-		panic("pool: new function is nil")
+		return nil, ErrNilNewFn
 	}
 
 	return &Pool[T]{
@@ -24,7 +29,7 @@ func New[T Resettable](newFn func() T) *Pool[T] {
 				return newFn()
 			},
 		},
-	}
+	}, nil
 }
 
 // Get возвращает объект из пула.

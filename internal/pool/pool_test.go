@@ -1,6 +1,7 @@
 package pool
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -20,9 +21,12 @@ func (o *testObject) Reset() {
 }
 
 func TestNewGetPut_ResetCalledAndObjectReused(t *testing.T) {
-	p := New(func() *testObject {
+	p, err := New(func() *testObject {
 		return &testObject{value: "new"}
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	obj := p.Get()
 	obj.value = "dirty"
@@ -43,10 +47,13 @@ func TestNewGetPut_ResetCalledAndObjectReused(t *testing.T) {
 
 func TestGet_UsesConstructorWhenPoolEmpty(t *testing.T) {
 	var created int
-	p := New(func() *testObject {
+	p, err := New(func() *testObject {
 		created++
 		return &testObject{}
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	_ = p.Get()
 	_ = p.Get()
@@ -57,9 +64,12 @@ func TestGet_UsesConstructorWhenPoolEmpty(t *testing.T) {
 }
 
 func TestPool_ConcurrentGetPut(t *testing.T) {
-	p := New(func() *testObject {
+	p, err := New(func() *testObject {
 		return &testObject{value: "new"}
 	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 
 	const goroutines = 16
 	const iterations = 200
@@ -83,5 +93,15 @@ func TestPool_ConcurrentGetPut(t *testing.T) {
 
 	if totalResetCalls.Load() != goroutines*iterations {
 		t.Fatalf("unexpected total reset count marker: got %d", totalResetCalls.Load())
+	}
+}
+
+func TestNew_ReturnsErrorOnNilConstructor(t *testing.T) {
+	p, err := New[*testObject](nil)
+	if p != nil {
+		t.Fatal("expected nil pool")
+	}
+	if !errors.Is(err, ErrNilNewFn) {
+		t.Fatalf("expected ErrNilNewFn, got %v", err)
 	}
 }
