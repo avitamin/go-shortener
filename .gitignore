@@ -35,3 +35,5 @@ bench-*.txt
 
 # Utility scripts (keep in repo for convenience)
 # check_optimization.sh
+
+.codex/config.toml

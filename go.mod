@@ -1,11 +1,24 @@
 module github.com/avitamin/go-shortener
 
-go 1.24
+go 1.24.0
 
 require (
 	github.com/caarlos0/env/v6 v6.10.1
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-migrate/migrate/v4 v4.19.0
+	github.com/gostaticanalysis/nilerr v0.1.2
+	github.com/timakin/bodyclose v0.0.0-20260129054331-73d1f95b84b4
+	golang.org/x/tools v0.42.0
+	honnef.co/go/tools v0.6.1
+)
+
+require (
+	github.com/gostaticanalysis/analysisutil v0.7.1 // indirect
+	github.com/gostaticanalysis/comment v1.5.0 // indirect
+	golang.org/x/exp/typeparams v0.0.0-20231108232855-2478ac86f678 // indirect
+	golang.org/x/mod v0.33.0 // indirect
+	golang.org/x/tools/go/expect v0.1.1-deprecated // indirect
+	golang.org/x/tools/go/packages/packagestest v0.1.1-deprecated // indirect
 )
 
 require (
@@ -17,8 +30,8 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	golang.org/x/crypto v0.37.0 // indirect
-	golang.org/x/sync v0.13.0 // indirect
-	golang.org/x/text v0.24.0 // indirect
+	golang.org/x/sync v0.19.0 // indirect
+	golang.org/x/text v0.28.0 // indirect
 )
 
 require (

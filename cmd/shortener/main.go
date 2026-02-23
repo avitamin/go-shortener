@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -23,7 +24,14 @@ import (
 	"github.com/avitamin/go-shortener/internal/service"
 )
 
+var buildVersion string
+var buildDate string
+var buildCommit string
+
 func main() {
+	fmt.Printf("Build version: %s\n", valueOrNA(buildVersion))
+	fmt.Printf("Build date: %s\n", valueOrNA(buildDate))
+	fmt.Printf("Build commit: %s\n", valueOrNA(buildCommit))
 
 	cfg, err := config.New(true)
 	if err != nil {
@@ -98,4 +106,12 @@ func main() {
 	}
 
 	svc.Audit.Close()
+}
+
+func valueOrNA(value string) string {
+	if value == "" {
+		return "N/A"
+	}
+
+	return value
 }
