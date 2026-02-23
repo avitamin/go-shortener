@@ -21,6 +21,7 @@ func TestConfig(t *testing.T) {
 		args                []string
 		env                 map[string]string
 		wantAddress         string
+		wantEnableHTTPS     bool
 		wantBaseURL         string
 		wantFileStoragePath string
 		wantDatabaseDsn     string
@@ -32,6 +33,7 @@ func TestConfig(t *testing.T) {
 			name:                "defaults only",
 			args:                []string{"cmd"},
 			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
 			wantDatabaseDsn:     "",
@@ -45,6 +47,7 @@ func TestConfig(t *testing.T) {
 				"SECRET_KEY": "secret_key",
 			},
 			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
 			wantDatabaseDsn:     "",
@@ -54,11 +57,12 @@ func TestConfig(t *testing.T) {
 		},
 		{
 			name: "flags override defaults",
-			args: []string{"cmd", "-a=127.0.0.1:9001", "-b=http://127.0.0.1:9001", "-f=./runtime/new-storage", "-d=postgres://postgres:postgres@db:5432/new_db"},
+			args: []string{"cmd", "-a=127.0.0.1:9001", "-b=http://127.0.0.1:9001", "-f=./runtime/new-storage", "-d=postgres://postgres:postgres@db:5432/new_db", "-s=true"},
 			env: map[string]string{
 				"SECRET_KEY": "secret_key",
 			},
 			wantAddress:         "127.0.0.1:9001",
+			wantEnableHTTPS:     true,
 			wantBaseURL:         "http://127.0.0.1:9001",
 			wantFileStoragePath: "./runtime/new-storage",
 			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/new_db",
@@ -70,6 +74,7 @@ func TestConfig(t *testing.T) {
 			name: "env override defaults",
 			env: map[string]string{
 				"SERVER_ADDRESS":    "0.0.0.0:9002",
+				"ENABLE_HTTPS":      "true",
 				"BASE_URL":          "http://0.0.0.0:9002",
 				"FILE_STORAGE_PATH": "./runtime/new-storage",
 				"DATABASE_DSN":      "postgres://postgres:postgres@db:5432/env_db",
@@ -77,6 +82,7 @@ func TestConfig(t *testing.T) {
 			},
 			args:                []string{"cmd"},
 			wantAddress:         "0.0.0.0:9002",
+			wantEnableHTTPS:     true,
 			wantBaseURL:         "http://0.0.0.0:9002",
 			wantFileStoragePath: "./runtime/new-storage",
 			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
@@ -88,13 +94,15 @@ func TestConfig(t *testing.T) {
 			name: "env overrides flags",
 			env: map[string]string{
 				"SERVER_ADDRESS":    "0.0.0.0:9999",
+				"ENABLE_HTTPS":      "false",
 				"BASE_URL":          "http://127.0.0.1:9994",
 				"FILE_STORAGE_PATH": "./runtime/env_storage",
 				"DATABASE_DSN":      "postgres://postgres:postgres@db:5432/env_db",
 				"SECRET_KEY":        "secret_key",
 			},
-			args:                []string{"cmd", "-a=127.0.0.1:9003", "-b=http://127.0.0.1:9003", "-f=./runtime/flag_storage", "-d=postgres://postgres:postgres@db:5432/flag_db"},
+			args:                []string{"cmd", "-a=127.0.0.1:9003", "-b=http://127.0.0.1:9003", "-f=./runtime/flag_storage", "-d=postgres://postgres:postgres@db:5432/flag_db", "-s=true"},
 			wantAddress:         "0.0.0.0:9999",
+			wantEnableHTTPS:     false,
 			wantBaseURL:         "http://127.0.0.1:9994",
 			wantFileStoragePath: "./runtime/env_storage",
 			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
@@ -109,6 +117,7 @@ func TestConfig(t *testing.T) {
 				"SECRET_KEY": "secret_key",
 			},
 			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
 			wantDatabaseDsn:     "",
@@ -125,6 +134,7 @@ func TestConfig(t *testing.T) {
 				"AUDIT_URL":  "http://audit-env-server:8080",
 			},
 			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
 			wantDatabaseDsn:     "",
@@ -141,6 +151,7 @@ func TestConfig(t *testing.T) {
 				"AUDIT_URL":  "http://env-audit-server:8080",
 			},
 			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
 			wantBaseURL:         "http://localhost:8080",
 			wantFileStoragePath: "./runtime/storage",
 			wantDatabaseDsn:     "",
@@ -169,6 +180,7 @@ func TestConfig(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tt.wantAddress, cfg.Address)
+			assert.Equal(t, tt.wantEnableHTTPS, cfg.EnableHTTPS)
 			assert.Equal(t, tt.wantBaseURL, cfg.BaseURL)
 			assert.Equal(t, tt.wantFileStoragePath, cfg.FileStoragePath)
 			assert.Equal(t, tt.wantDatabaseDsn, cfg.DatabaseDsn)

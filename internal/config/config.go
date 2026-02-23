@@ -26,6 +26,8 @@ const DefaultFileStoragePath = "./runtime/storage"
 type Config struct {
 	// Address — адрес и порт для запуска HTTP-сервера.
 	Address string `env:"SERVER_ADDRESS"`
+	// EnableHTTPS — включает запуск HTTPS-сервера.
+	EnableHTTPS bool `env:"ENABLE_HTTPS"`
 	// BaseURL — базовый URL для формирования коротких ссылок.
 	BaseURL string `env:"BASE_URL"`
 	// FileStoragePath — путь к файлу для хранения данных.
@@ -51,6 +53,7 @@ func New(withParse bool) (*Config, error) {
 	flag.StringVar(&cfg.BaseURL, "b", DefaultBaseURL, "базовый URL (например http://localhost:8080)")
 	flag.StringVar(&cfg.FileStoragePath, "f", DefaultFileStoragePath, "путь к файлу хранилища (например ./runtime/storage)")
 	flag.StringVar(&cfg.DatabaseDsn, "d", "", "DSN (например postgres://postgres:postgres@db:5432/postgres)")
+	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "включить HTTPS")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "путь к файлу для логов аудита")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL удаленного сервера для логов аудита")
 
