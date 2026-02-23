@@ -109,9 +109,6 @@ func runMainExit(pass *analysis.Pass) (any, error) {
 	if pass.Pkg == nil || pass.Pkg.Name() != "main" {
 		return nil, nil
 	}
-	if !strings.HasPrefix(pass.Pkg.Path(), "github.com/avitamin/go-shortener") {
-		return nil, nil
-	}
 
 	for _, file := range pass.Files {
 		fileName := pass.Fset.Position(file.Package).Filename
