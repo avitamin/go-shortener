@@ -3,6 +3,7 @@ package config_test
 import (
 	"flag"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/avitamin/go-shortener/internal/config"
@@ -17,9 +18,10 @@ func ClearFlags() {
 func TestConfig(t *testing.T) {
 	tests := []struct {
 		name                string
-		wantError           error
+		wantError           string
 		args                []string
 		env                 map[string]string
+		configJSON          string
 		wantAddress         string
 		wantEnableHTTPS     bool
 		wantBaseURL         string
@@ -40,7 +42,8 @@ func TestConfig(t *testing.T) {
 			wantSecretKey:       "secret_key",
 			wantAuditFile:       "",
 			wantAuditURL:        "",
-		}, {
+		},
+		{
 			name: "defaults with secret key from env",
 			args: []string{"cmd"},
 			env: map[string]string{
@@ -111,6 +114,77 @@ func TestConfig(t *testing.T) {
 			wantAuditURL:        "",
 		},
 		{
+			name:       "config file applies when no env and flags",
+			args:       []string{"cmd", "-c=config.json"},
+			configJSON: `{"server_address":"127.0.0.1:7777","base_url":"http://127.0.0.1:7777","file_storage_path":"./runtime/from-file","database_dsn":"postgres://postgres:postgres@db:5432/from_file","enable_https":true}`,
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+			wantAddress:         "127.0.0.1:7777",
+			wantEnableHTTPS:     true,
+			wantBaseURL:         "http://127.0.0.1:7777",
+			wantFileStoragePath: "./runtime/from-file",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/from_file",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+		},
+		{
+			name:       "flags override config file",
+			args:       []string{"cmd", "-c=config.json", "-a=127.0.0.1:9001", "-s=true"},
+			configJSON: `{"server_address":"127.0.0.1:7777","base_url":"http://127.0.0.1:7777","file_storage_path":"./runtime/from-file","database_dsn":"postgres://postgres:postgres@db:5432/from_file","enable_https":false}`,
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+			wantAddress:         "127.0.0.1:9001",
+			wantEnableHTTPS:     true,
+			wantBaseURL:         "http://127.0.0.1:7777",
+			wantFileStoragePath: "./runtime/from-file",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/from_file",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+		},
+		{
+			name:       "env overrides config file and config env overrides config flag",
+			args:       []string{"cmd", "-c=wrong.json"},
+			configJSON: `{"server_address":"127.0.0.1:7777","base_url":"http://127.0.0.1:7777","file_storage_path":"./runtime/from-file","database_dsn":"postgres://postgres:postgres@db:5432/from_file","enable_https":false}`,
+			env: map[string]string{
+				"CONFIG":            "config.json",
+				"SERVER_ADDRESS":    "0.0.0.0:9002",
+				"ENABLE_HTTPS":      "true",
+				"BASE_URL":          "http://0.0.0.0:9002",
+				"FILE_STORAGE_PATH": "./runtime/new-storage",
+				"DATABASE_DSN":      "postgres://postgres:postgres@db:5432/env_db",
+				"SECRET_KEY":        "secret_key",
+			},
+			wantAddress:         "0.0.0.0:9002",
+			wantEnableHTTPS:     true,
+			wantBaseURL:         "http://0.0.0.0:9002",
+			wantFileStoragePath: "./runtime/new-storage",
+			wantDatabaseDsn:     "postgres://postgres:postgres@db:5432/env_db",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+		},
+		{
+			name:      "missing config file returns error",
+			args:      []string{"cmd", "-c=missing.json"},
+			wantError: "reading config file",
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+		},
+		{
+			name:       "invalid config file returns error",
+			args:       []string{"cmd", "-config=config.json"},
+			configJSON: `{invalid json}`,
+			wantError:  "parsing config file",
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+		},
+		{
 			name: "audit flags set",
 			args: []string{"cmd", "--audit-file=/var/log/audit.log", "--audit-url=http://audit-server:8080"},
 			env: map[string]string{
@@ -163,18 +237,42 @@ func TestConfig(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// установить переменные окружения
+			os.Clearenv()
+			defer os.Clearenv()
+
 			for k, v := range tt.env {
 				os.Setenv(k, v)
 			}
-			defer os.Clearenv()
+
+			if tt.configJSON != "" {
+				tempDir := t.TempDir()
+				configPath := filepath.Join(tempDir, "config.json")
+				err := os.WriteFile(configPath, []byte(tt.configJSON), 0o600)
+				assert.NoError(t, err)
+
+				for i, arg := range tt.args {
+					if arg == "-c=config.json" || arg == "-config=config.json" {
+						tt.args[i] = tt.args[i][:len(tt.args[i])-len("config.json")] + configPath
+					}
+					if arg == "-c=wrong.json" {
+						tt.args[i] = tt.args[i][:len(tt.args[i])-len("wrong.json")] + filepath.Join(tempDir, "wrong.json")
+					}
+				}
+
+				if configEnvPath, ok := tt.env["CONFIG"]; ok {
+					if configEnvPath == "config.json" {
+						os.Setenv("CONFIG", configPath)
+					}
+				}
+			}
 
 			os.Args = tt.args
 			defer ClearFlags()
 
 			cfg, err := config.New(true)
-			if tt.wantError != nil {
-				assert.ErrorIs(t, err, tt.wantError)
+			if tt.wantError != "" {
+				assert.Error(t, err)
+				assert.ErrorContains(t, err, tt.wantError)
 				return
 			}
 
