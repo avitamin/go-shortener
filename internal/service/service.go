@@ -8,6 +8,7 @@ import (
 	"errors"
 	"io"
 	"log"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -21,6 +22,9 @@ import (
 // ErrNoUserIDInContext возвращается, когда в контексте отсутствует идентификатор пользователя.
 var ErrNoUserIDInContext = errors.New("no user ID in context")
 
+// ErrServiceShuttingDown возвращается, когда сервис находится в процессе остановки.
+var ErrServiceShuttingDown = errors.New("service is shutting down")
+
 const deleteUserURLsWorkersCoount = 5
 
 // ShortenerService — основной сервис для работы с сокращенными URL.
@@ -29,6 +33,10 @@ type ShortenerService struct {
 	// Config содержит конфигурацию сервиса.
 	Config         *config.Config
 	deleteUserURLs chan DeleteUserURLs
+	deleteQueue    *deleteQueue
+	stopWorkers    chan struct{}
+	workersWG      sync.WaitGroup
+	shutdownOnce   sync.Once
 	// Audit — сервис аудита для логирования операций.
 	Audit *audit.Service
 }
@@ -48,6 +56,8 @@ func NewShortenerService(repo repository.Repository, config *config.Config, audi
 		repo:           repo,
 		Config:         config,
 		deleteUserURLs: make(chan DeleteUserURLs, 10),
+		deleteQueue:    newDeleteQueue(),
+		stopWorkers:    make(chan struct{}),
 		Audit:          auditService,
 	}
 
@@ -233,9 +243,17 @@ func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []strin
 		return ErrNoUserIDInContext
 	}
 
-	s.deleteUserURLs <- DeleteUserURLs{
-		ShortURLs: shortURLs,
+	req := DeleteUserURLs{
+		ShortURLs: slices.Clone(shortURLs),
 		UserID:    userID,
+	}
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-s.stopWorkers:
+		return ErrServiceShuttingDown
+	case s.deleteUserURLs <- req:
 	}
 
 	return nil
@@ -243,6 +261,7 @@ func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []strin
 
 func (s *ShortenerService) initDeleteWorkers() {
 	for range deleteUserURLsWorkersCoount {
+		s.workersWG.Add(1)
 		go s.deleteWorker()
 	}
 }
@@ -258,39 +277,22 @@ func newDeleteQueue() *deleteQueue {
 	}
 }
 
-var dQ = newDeleteQueue()
-
 func (s *ShortenerService) deleteWorker() {
+	defer s.workersWG.Done()
 
 	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
 
 	for {
 		select {
 		case deleteReq := <-s.deleteUserURLs:
-			dQ.Lock()
-			dQ.Items[deleteReq.UserID] = append(dQ.Items[deleteReq.UserID], deleteReq.ShortURLs...)
-			dQ.Unlock()
+			s.enqueueDelete(deleteReq)
 			log.Printf("Queued %d URLs for deletion for user %s", len(deleteReq.ShortURLs), deleteReq.UserID)
-
-			log.Printf("%v", dQ.Items)
 		case <-ticker.C:
-			dQ.Lock()
-			batch := dQ.Items
-			dQ.Items = make(map[string][]string)
-			dQ.Unlock()
-
-			for userID, shortURLs := range batch {
-				log.Printf("Flushing deletion of %v for user %s", shortURLs, userID)
-
-				err := s.flushDeleteUserURLs(userID, shortURLs)
-				if err != nil {
-					log.Printf("Error deleting URLs for user %s: %v", userID, err)
-					continue
-				}
-
-				// После успешного удаления очищаем список
-				delete(dQ.Items, userID)
-			}
+			s.flushDeleteQueueOnce()
+		case <-s.stopWorkers:
+			s.drainDeleteRequests()
+			return
 		}
 	}
 }
@@ -301,6 +303,110 @@ func (s *ShortenerService) flushDeleteUserURLs(userID string, shortURLs []string
 	if err != nil {
 		log.Printf("Error deleting URLs for user %s: %v", userID, err)
 		return err
+	}
+
+	return nil
+}
+
+func (s *ShortenerService) enqueueDelete(req DeleteUserURLs) {
+	s.deleteQueue.Lock()
+	s.deleteQueue.Items[req.UserID] = append(s.deleteQueue.Items[req.UserID], req.ShortURLs...)
+	s.deleteQueue.Unlock()
+}
+
+func (s *ShortenerService) drainDeleteRequests() {
+	for {
+		select {
+		case req := <-s.deleteUserURLs:
+			s.enqueueDelete(req)
+		default:
+			return
+		}
+	}
+}
+
+func (s *ShortenerService) popDeleteBatch() map[string][]string {
+	s.deleteQueue.Lock()
+	defer s.deleteQueue.Unlock()
+
+	batch := s.deleteQueue.Items
+	s.deleteQueue.Items = make(map[string][]string)
+
+	return batch
+}
+
+func (s *ShortenerService) pendingDeleteCount() int {
+	s.deleteQueue.Lock()
+	defer s.deleteQueue.Unlock()
+
+	count := 0
+	for _, shortURLs := range s.deleteQueue.Items {
+		count += len(shortURLs)
+	}
+
+	return count
+}
+
+func (s *ShortenerService) flushDeleteQueueOnce() {
+	batch := s.popDeleteBatch()
+	for userID, shortURLs := range batch {
+		log.Printf("Flushing deletion of %v for user %s", shortURLs, userID)
+
+		if err := s.flushDeleteUserURLs(userID, shortURLs); err != nil {
+			log.Printf("Error deleting URLs for user %s: %v", userID, err)
+			s.enqueueDelete(DeleteUserURLs{
+				ShortURLs: shortURLs,
+				UserID:    userID,
+			})
+		}
+	}
+}
+
+func (s *ShortenerService) flushDeleteQueueUntilEmpty(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		s.flushDeleteQueueOnce()
+		if s.pendingDeleteCount() == 0 {
+			return nil
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(100 * time.Millisecond):
+		}
+	}
+}
+
+// Shutdown останавливает фоновые воркеры и дожидается сохранения накопленных удалений.
+func (s *ShortenerService) Shutdown(ctx context.Context) error {
+	s.shutdownOnce.Do(func() {
+		close(s.stopWorkers)
+	})
+
+	workersDone := make(chan struct{})
+	go func() {
+		s.workersWG.Wait()
+		close(workersDone)
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-workersDone:
+	}
+
+	if err := s.flushDeleteQueueUntilEmpty(ctx); err != nil {
+		return err
+	}
+
+	if s.Audit != nil {
+		s.Audit.Close()
 	}
 
 	return nil

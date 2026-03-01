@@ -104,7 +104,7 @@ func main() {
 	}()
 
 	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-stop
 
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -114,7 +114,12 @@ func main() {
 		log.Printf("server shutdown error: %v", err)
 	}
 
-	svc.Audit.Close()
+	serviceShutdownCtx, serviceCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer serviceCancel()
+
+	if err := svc.Shutdown(serviceShutdownCtx); err != nil {
+		log.Printf("service shutdown error: %v", err)
+	}
 }
 
 func valueOrNA(value string) string {
