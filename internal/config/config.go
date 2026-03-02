@@ -98,6 +98,8 @@ func New(withParse bool) (*Config, error) {
 	return &cfg, nil
 }
 
+// applyFileConfig загружает значения из JSON-конфига с учетом приоритетов:
+// переменные окружения и CLI-флаги выше значений из файла.
 func applyFileConfig(cfg *Config, path string, flagsSet map[string]struct{}) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -114,39 +116,79 @@ func applyFileConfig(cfg *Config, path string, flagsSet map[string]struct{}) err
 		return fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
-	if isFieldSet(fields, "server_address") && !isSetByFlagOrEnv("a", "SERVER_ADDRESS", flagsSet) {
-		cfg.Address = fromFile.Address
+	type configFieldRule struct {
+		jsonName string
+		canApply func() bool
+		apply    func()
 	}
-	if isFieldSet(fields, "base_url") && !isSetByFlagOrEnv("b", "BASE_URL", flagsSet) {
-		cfg.BaseURL = fromFile.BaseURL
+
+	rules := []configFieldRule{
+		{
+			jsonName: "server_address",
+			canApply: func() bool { return shouldApplyFileValue("a", "SERVER_ADDRESS", flagsSet) },
+			apply:    func() { cfg.Address = fromFile.Address },
+		},
+		{
+			jsonName: "base_url",
+			canApply: func() bool { return shouldApplyFileValue("b", "BASE_URL", flagsSet) },
+			apply:    func() { cfg.BaseURL = fromFile.BaseURL },
+		},
+		{
+			jsonName: "file_storage_path",
+			canApply: func() bool { return shouldApplyFileValue("f", "FILE_STORAGE_PATH", flagsSet) },
+			apply:    func() { cfg.FileStoragePath = fromFile.FileStoragePath },
+		},
+		{
+			jsonName: "database_dsn",
+			canApply: func() bool { return shouldApplyFileValue("d", "DATABASE_DSN", flagsSet) },
+			apply:    func() { cfg.DatabaseDsn = fromFile.DatabaseDsn },
+		},
+		{
+			jsonName: "enable_https",
+			canApply: func() bool { return shouldApplyFileValue("s", "ENABLE_HTTPS", flagsSet) },
+			apply:    func() { cfg.EnableHTTPS = fromFile.EnableHTTPS },
+		},
+		{
+			jsonName: "secret_key",
+			canApply: func() bool { return isEnvUnset("SECRET_KEY") },
+			apply:    func() { cfg.SecretKey = fromFile.SecretKey },
+		},
+		{
+			jsonName: "audit_file",
+			canApply: func() bool { return shouldApplyFileValue("audit-file", "AUDIT_FILE", flagsSet) },
+			apply:    func() { cfg.AuditFile = fromFile.AuditFile },
+		},
+		{
+			jsonName: "audit_url",
+			canApply: func() bool { return shouldApplyFileValue("audit-url", "AUDIT_URL", flagsSet) },
+			apply:    func() { cfg.AuditURL = fromFile.AuditURL },
+		},
 	}
-	if isFieldSet(fields, "file_storage_path") && !isSetByFlagOrEnv("f", "FILE_STORAGE_PATH", flagsSet) {
-		cfg.FileStoragePath = fromFile.FileStoragePath
-	}
-	if isFieldSet(fields, "database_dsn") && !isSetByFlagOrEnv("d", "DATABASE_DSN", flagsSet) {
-		cfg.DatabaseDsn = fromFile.DatabaseDsn
-	}
-	if isFieldSet(fields, "enable_https") && !isSetByFlagOrEnv("s", "ENABLE_HTTPS", flagsSet) {
-		cfg.EnableHTTPS = fromFile.EnableHTTPS
-	}
-	if isFieldSet(fields, "secret_key") && !isSetByEnv("SECRET_KEY") {
-		cfg.SecretKey = fromFile.SecretKey
-	}
-	if isFieldSet(fields, "audit_file") && !isSetByFlagOrEnv("audit-file", "AUDIT_FILE", flagsSet) {
-		cfg.AuditFile = fromFile.AuditFile
-	}
-	if isFieldSet(fields, "audit_url") && !isSetByFlagOrEnv("audit-url", "AUDIT_URL", flagsSet) {
-		cfg.AuditURL = fromFile.AuditURL
+
+	for _, rule := range rules {
+		if !isFieldSet(fields, rule.jsonName) || !rule.canApply() {
+			continue
+		}
+
+		rule.apply()
 	}
 
 	return nil
 }
 
+// isFieldSet проверяет, что поле присутствует в JSON и явно не равно null.
 func isFieldSet(fields map[string]json.RawMessage, name string) bool {
 	raw, ok := fields[name]
 	return ok && !bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 
+// shouldApplyFileValue возвращает true, когда значение из файла можно применить:
+// только если ни флаг, ни переменная окружения не задают это поле.
+func shouldApplyFileValue(flagName string, envName string, flagsSet map[string]struct{}) bool {
+	return !isSetByFlagOrEnv(flagName, envName, flagsSet)
+}
+
+// isSetByFlagOrEnv проверяет, задано ли поле через CLI-флаг или переменную окружения.
 func isSetByFlagOrEnv(flagName string, envName string, flagsSet map[string]struct{}) bool {
 	if _, ok := flagsSet[flagName]; ok {
 		return true
@@ -155,9 +197,15 @@ func isSetByFlagOrEnv(flagName string, envName string, flagsSet map[string]struc
 	return isSetByEnv(envName)
 }
 
+// isSetByEnv проверяет, что переменная окружения присутствует (даже если пустая).
 func isSetByEnv(envName string) bool {
 	_, ok := os.LookupEnv(envName)
 	return ok
+}
+
+// isEnvUnset проверяет, что переменная окружения отсутствует.
+func isEnvUnset(envName string) bool {
+	return !isSetByEnv(envName)
 }
 
 // ParseFlags парсит флаги командной строки.
