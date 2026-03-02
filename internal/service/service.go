@@ -363,6 +363,9 @@ func (s *ShortenerService) flushDeleteQueueOnce() {
 }
 
 func (s *ShortenerService) flushDeleteQueueUntilEmpty(ctx context.Context) error {
+	timer := time.NewTimer(100 * time.Millisecond)
+	defer timer.Stop()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -375,10 +378,18 @@ func (s *ShortenerService) flushDeleteQueueUntilEmpty(ctx context.Context) error
 			return nil
 		}
 
+		if !timer.Stop() {
+			select {
+			case <-timer.C:
+			default:
+			}
+		}
+		timer.Reset(100 * time.Millisecond)
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(100 * time.Millisecond):
+		case <-timer.C:
 		}
 	}
 }
