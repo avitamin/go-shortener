@@ -130,6 +130,9 @@ func valueOrNA(value string) string {
 	return value
 }
 
+// launchServer запускает HTTP или HTTPS-сервер.
+// При HTTPS используется самоподписанный сертификат, который генерируется при каждом старте.
+// Из-за этого браузер будет считать сертификат новым/недоверенным и показывать предупреждение.
 func launchServer(server *http.Server, enableHTTPS bool) error {
 	if !enableHTTPS {
 		return server.ListenAndServe()
@@ -149,6 +152,7 @@ func launchServer(server *http.Server, enableHTTPS bool) error {
 	}
 
 	log.Printf("HTTPS включен для адреса %s\n", server.Addr)
+	log.Println("Используется самоподписанный сертификат, сгенерированный при запуске: браузер может показать предупреждение о безопасности")
 	return server.Serve(listener)
 }
 
