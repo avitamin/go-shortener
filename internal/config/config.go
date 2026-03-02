@@ -2,6 +2,7 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -27,29 +28,21 @@ const DefaultFileStoragePath = "./runtime/storage"
 // Config содержит параметры конфигурации сервиса.
 type Config struct {
 	// Address — адрес и порт для запуска HTTP-сервера.
-	Address string `env:"SERVER_ADDRESS"`
+	Address string `env:"SERVER_ADDRESS" json:"server_address"`
 	// EnableHTTPS — включает запуск HTTPS-сервера.
-	EnableHTTPS bool `env:"ENABLE_HTTPS"`
+	EnableHTTPS bool `env:"ENABLE_HTTPS" json:"enable_https"`
 	// BaseURL — базовый URL для формирования коротких ссылок.
-	BaseURL string `env:"BASE_URL"`
+	BaseURL string `env:"BASE_URL" json:"base_url"`
 	// FileStoragePath — путь к файлу для хранения данных.
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH" json:"file_storage_path"`
 	// DatabaseDsn — строка подключения к базе данных PostgreSQL.
-	DatabaseDsn string `env:"DATABASE_DSN"`
+	DatabaseDsn string `env:"DATABASE_DSN" json:"database_dsn"`
 	// SecretKey — секретный ключ для подписи JWT-токенов и cookies.
-	SecretKey string `env:"SECRET_KEY"`
+	SecretKey string `env:"SECRET_KEY" json:"secret_key"`
 	// AuditFile — путь к файлу для сохранения логов аудита.
-	AuditFile string `env:"AUDIT_FILE"`
+	AuditFile string `env:"AUDIT_FILE" json:"audit_file"`
 	// AuditURL — URL удаленного сервера для отправки логов аудита.
-	AuditURL string `env:"AUDIT_URL"`
-}
-
-type fileConfig struct {
-	Address         *string `json:"server_address"`
-	BaseURL         *string `json:"base_url"`
-	FileStoragePath *string `json:"file_storage_path"`
-	DatabaseDsn     *string `json:"database_dsn"`
-	EnableHTTPS     *bool   `json:"enable_https"`
+	AuditURL string `env:"AUDIT_URL" json:"audit_url"`
 }
 
 // New создает новый экземпляр Config.
@@ -111,28 +104,47 @@ func applyFileConfig(cfg *Config, path string, flagsSet map[string]struct{}) err
 		return fmt.Errorf("reading config file %q: %w", path, err)
 	}
 
-	var fromFile fileConfig
+	var fromFile Config
 	if err := json.Unmarshal(data, &fromFile); err != nil {
 		return fmt.Errorf("parsing config file %q: %w", path, err)
 	}
 
-	if fromFile.Address != nil && !isSetByFlagOrEnv("a", "SERVER_ADDRESS", flagsSet) {
-		cfg.Address = *fromFile.Address
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return fmt.Errorf("parsing config file %q: %w", path, err)
 	}
-	if fromFile.BaseURL != nil && !isSetByFlagOrEnv("b", "BASE_URL", flagsSet) {
-		cfg.BaseURL = *fromFile.BaseURL
+
+	if isFieldSet(fields, "server_address") && !isSetByFlagOrEnv("a", "SERVER_ADDRESS", flagsSet) {
+		cfg.Address = fromFile.Address
 	}
-	if fromFile.FileStoragePath != nil && !isSetByFlagOrEnv("f", "FILE_STORAGE_PATH", flagsSet) {
-		cfg.FileStoragePath = *fromFile.FileStoragePath
+	if isFieldSet(fields, "base_url") && !isSetByFlagOrEnv("b", "BASE_URL", flagsSet) {
+		cfg.BaseURL = fromFile.BaseURL
 	}
-	if fromFile.DatabaseDsn != nil && !isSetByFlagOrEnv("d", "DATABASE_DSN", flagsSet) {
-		cfg.DatabaseDsn = *fromFile.DatabaseDsn
+	if isFieldSet(fields, "file_storage_path") && !isSetByFlagOrEnv("f", "FILE_STORAGE_PATH", flagsSet) {
+		cfg.FileStoragePath = fromFile.FileStoragePath
 	}
-	if fromFile.EnableHTTPS != nil && !isSetByFlagOrEnv("s", "ENABLE_HTTPS", flagsSet) {
-		cfg.EnableHTTPS = *fromFile.EnableHTTPS
+	if isFieldSet(fields, "database_dsn") && !isSetByFlagOrEnv("d", "DATABASE_DSN", flagsSet) {
+		cfg.DatabaseDsn = fromFile.DatabaseDsn
+	}
+	if isFieldSet(fields, "enable_https") && !isSetByFlagOrEnv("s", "ENABLE_HTTPS", flagsSet) {
+		cfg.EnableHTTPS = fromFile.EnableHTTPS
+	}
+	if isFieldSet(fields, "secret_key") && !isSetByEnv("SECRET_KEY") {
+		cfg.SecretKey = fromFile.SecretKey
+	}
+	if isFieldSet(fields, "audit_file") && !isSetByFlagOrEnv("audit-file", "AUDIT_FILE", flagsSet) {
+		cfg.AuditFile = fromFile.AuditFile
+	}
+	if isFieldSet(fields, "audit_url") && !isSetByFlagOrEnv("audit-url", "AUDIT_URL", flagsSet) {
+		cfg.AuditURL = fromFile.AuditURL
 	}
 
 	return nil
+}
+
+func isFieldSet(fields map[string]json.RawMessage, name string) bool {
+	raw, ok := fields[name]
+	return ok && !bytes.Equal(bytes.TrimSpace(raw), []byte("null"))
 }
 
 func isSetByFlagOrEnv(flagName string, envName string, flagsSet map[string]struct{}) bool {
@@ -140,6 +152,10 @@ func isSetByFlagOrEnv(flagName string, envName string, flagsSet map[string]struc
 		return true
 	}
 
+	return isSetByEnv(envName)
+}
+
+func isSetByEnv(envName string) bool {
 	_, ok := os.LookupEnv(envName)
 	return ok
 }
