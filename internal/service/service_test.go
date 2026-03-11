@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
@@ -167,4 +168,85 @@ func TestShorterenerService(t *testing.T) {
 		})
 	}
 
+}
+
+func TestShortenerServiceShutdownFlushesDeleteQueue(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := mock_repository.NewMockRepository(ctrl)
+	repo.EXPECT().DeleteUserURLs(gomock.Any(), "test-user-id", []string{"short1", "short2"}).Return(nil).Times(1)
+
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
+
+	ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
+	err := svc.DeleteUserURLs(ctx, []string{"short1", "short2"})
+	assert.NoError(t, err)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err = svc.Shutdown(shutdownCtx)
+	assert.NoError(t, err)
+}
+
+func TestShortenerServiceDeleteUserURLsReturnsErrorAfterShutdown(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := mock_repository.NewMockRepository(ctrl)
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	err := svc.Shutdown(shutdownCtx)
+	assert.NoError(t, err)
+
+	ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
+	err = svc.DeleteUserURLs(ctx, []string{"short1"})
+	assert.ErrorIs(t, err, service.ErrServiceShuttingDown)
+}
+
+func TestShortenerServiceShutdownRetriesDeleteQueueUntilSuccess(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := mock_repository.NewMockRepository(ctrl)
+	gomock.InOrder(
+		repo.EXPECT().DeleteUserURLs(gomock.Any(), "test-user-id", []string{"short1"}).Return(errors.New("temporary delete error")),
+		repo.EXPECT().DeleteUserURLs(gomock.Any(), "test-user-id", []string{"short1"}).Return(nil),
+	)
+
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
+	ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
+	err := svc.DeleteUserURLs(ctx, []string{"short1"})
+	assert.NoError(t, err)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	startedAt := time.Now()
+	err = svc.Shutdown(shutdownCtx)
+	assert.NoError(t, err)
+	assert.GreaterOrEqual(t, time.Since(startedAt), 90*time.Millisecond)
+}
+
+func TestShortenerServiceShutdownStopsRetriesWhenContextCanceled(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	repo := mock_repository.NewMockRepository(ctrl)
+	repo.EXPECT().DeleteUserURLs(gomock.Any(), "test-user-id", []string{"short1"}).Return(errors.New("permanent delete error")).AnyTimes()
+
+	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
+	ctx := context.WithValue(context.Background(), model.ContextUserID, "test-user-id")
+	err := svc.DeleteUserURLs(ctx, []string{"short1"})
+	assert.NoError(t, err)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	err = svc.Shutdown(shutdownCtx)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
 }

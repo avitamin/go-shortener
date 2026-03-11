@@ -37,3 +37,4 @@ bench-*.txt
 # check_optimization.sh
 
 .codex/config.toml
+.cache/*
