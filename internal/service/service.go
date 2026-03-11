@@ -259,6 +259,11 @@ func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []strin
 	return nil
 }
 
+// GetStats возвращает агрегированную статистику сервиса.
+func (s *ShortenerService) GetStats(ctx context.Context) (urls int, users int, err error) {
+	return s.repo.GetStats(ctx)
+}
+
 func (s *ShortenerService) initDeleteWorkers() {
 	for range deleteUserURLsWorkersCoount {
 		s.workersWG.Add(1)

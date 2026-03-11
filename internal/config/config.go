@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 
@@ -43,6 +44,8 @@ type Config struct {
 	AuditFile string `env:"AUDIT_FILE" json:"audit_file"`
 	// AuditURL — URL удаленного сервера для отправки логов аудита.
 	AuditURL string `env:"AUDIT_URL" json:"audit_url"`
+	// TrustedSubnet — доверенная подсеть в формате CIDR для внутренних эндпоинтов.
+	TrustedSubnet string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 }
 
 // New создает новый экземпляр Config.
@@ -60,6 +63,7 @@ func New(withParse bool) (*Config, error) {
 	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "включить HTTPS")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "путь к файлу для логов аудита")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL удаленного сервера для логов аудита")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "доверенная подсеть в формате CIDR (например 192.168.0.0/24)")
 	flag.StringVar(&configPath, "c", "", "путь к JSON-файлу конфигурации")
 	flag.StringVar(&configPath, "config", "", "путь к JSON-файлу конфигурации")
 
@@ -163,6 +167,11 @@ func applyFileConfig(cfg *Config, path string, flagsSet map[string]struct{}) err
 			canApply: func() bool { return shouldApplyFileValue("audit-url", "AUDIT_URL", flagsSet) },
 			apply:    func() { cfg.AuditURL = fromFile.AuditURL },
 		},
+		{
+			jsonName: "trusted_subnet",
+			canApply: func() bool { return shouldApplyFileValue("t", "TRUSTED_SUBNET", flagsSet) },
+			apply:    func() { cfg.TrustedSubnet = fromFile.TrustedSubnet },
+		},
 	}
 
 	for _, rule := range rules {
@@ -222,6 +231,12 @@ func (c *Config) Validate() error {
 
 	if _, err := url.ParseRequestURI(c.BaseURL); err != nil {
 		return fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	if c.TrustedSubnet != "" {
+		if _, _, err := net.ParseCIDR(c.TrustedSubnet); err != nil {
+			return fmt.Errorf("invalid trusted subnet: %w", err)
+		}
 	}
 
 	return nil

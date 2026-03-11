@@ -119,3 +119,38 @@ func TestInMemoryStorage_DeleteUserURLsOwnershipAndPing(t *testing.T) {
 		t.Fatalf("expected ErrDBNotConfigured, got %v", err)
 	}
 }
+
+func TestInMemoryStorage_GetStats(t *testing.T) {
+	r := NewInMemoryStorage()
+	ctx := context.Background()
+
+	if err := r.Save(ctx, model.URL{Short: "u1s1", Original: "https://u1-1", UserID: "u1"}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+	if err := r.Save(ctx, model.URL{Short: "u1s2", Original: "https://u1-2", UserID: "u1"}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+	if err := r.Save(ctx, model.URL{Short: "u2s1", Original: "https://u2-1", UserID: "u2"}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+	if err := r.Save(ctx, model.URL{Short: "anon", Original: "https://anon", UserID: ""}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	urls, users, err := r.GetStats(ctx)
+	if err != nil {
+		t.Fatalf("get stats failed: %v", err)
+	}
+	if urls != 4 {
+		t.Fatalf("expected 4 urls, got %d", urls)
+	}
+	if users != 2 {
+		t.Fatalf("expected 2 users, got %d", users)
+	}
+
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, _, err := r.GetStats(cancelled); err == nil {
+		t.Fatal("expected context error from get stats")
+	}
+}

@@ -40,6 +40,9 @@ type Repository interface {
 	// DeleteUserURLs помечает URL пользователя как удалённые.
 	DeleteUserURLs(ctx context.Context, userID string, shortens []string) error
 
+	// GetStats возвращает агрегированную статистику по URL и пользователям.
+	GetStats(ctx context.Context) (urls int, users int, err error)
+
 	// Close закрывает соединение с хранилищем.
 	Close() error
 

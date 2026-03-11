@@ -172,3 +172,26 @@ func (r *inMemoryStorage) DeleteUserURLs(ctx context.Context, userID string, sho
 
 	return nil
 }
+
+// GetStats возвращает агрегированную статистику по хранилищу.
+func (r *inMemoryStorage) GetStats(ctx context.Context) (urls int, users int, err error) {
+	select {
+	case <-ctx.Done():
+		return 0, 0, ctx.Err()
+	default:
+	}
+
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	uniqueUsers := make(map[string]struct{})
+	for _, userID := range r.userIDByShort {
+		if userID == "" {
+			continue
+		}
+
+		uniqueUsers[userID] = struct{}{}
+	}
+
+	return len(r.origByShort), len(uniqueUsers), nil
+}

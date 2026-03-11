@@ -214,3 +214,17 @@ func (r *DataBaseRepository) DeleteUserURLs(ctx context.Context, userID string, 
 
 	return nil
 }
+
+// GetStats возвращает агрегированную статистику по URL и пользователям из БД.
+func (r *DataBaseRepository) GetStats(ctx context.Context) (urls int, users int, err error) {
+	row := r.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*), COUNT(DISTINCT user_id) FILTER (WHERE user_id <> '') FROM urls`,
+	)
+
+	if err := row.Scan(&urls, &users); err != nil {
+		return 0, 0, err
+	}
+
+	return urls, users, nil
+}

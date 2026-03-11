@@ -105,3 +105,35 @@ func TestFileStorageRepository_UtilityMethods(t *testing.T) {
 		t.Fatalf("close failed: %v", err)
 	}
 }
+
+func TestFileStorageRepository_GetStats(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "stats.json")
+	repoI, err := NewFileStorageRepository(tmpFile)
+	if err != nil {
+		t.Fatalf("new repo failed: %v", err)
+	}
+	repo := repoI.(*fileStorageRepositoy)
+	defer repo.Close()
+
+	ctx := context.Background()
+	if err := repo.Save(ctx, model.URL{Short: "a", Original: "https://a", UserID: "u1"}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+	if err := repo.Save(ctx, model.URL{Short: "b", Original: "https://b", UserID: "u1"}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+	if err := repo.Save(ctx, model.URL{Short: "c", Original: "https://c", UserID: "u2"}); err != nil {
+		t.Fatalf("save failed: %v", err)
+	}
+
+	urls, users, err := repo.GetStats(ctx)
+	if err != nil {
+		t.Fatalf("get stats failed: %v", err)
+	}
+	if urls != 3 {
+		t.Fatalf("expected 3 urls, got %d", urls)
+	}
+	if users != 2 {
+		t.Fatalf("expected 2 users, got %d", users)
+	}
+}

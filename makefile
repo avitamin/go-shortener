@@ -21,6 +21,11 @@ lint:
 	@echo "🔍 Running staticlint multichecker..."
 	@go run ./cmd/staticlint ./...
 
+## 🧪 Обновление GoMock-ов
+mocks:
+	@echo "🧪 Generating mocks..."
+	@mockgen -source=internal/repository/repository.go -destination=internal/repository/mock/repository.mock.go -package=mock
+
 ## 🚀 Запуск docker-compose
 up:
 	@echo "🚀 Starting Docker containers..."
@@ -113,6 +118,7 @@ help:
 	@echo ""
 	@echo "Доступные команды:"
 	@echo "  make build          - Сборка Go бинарника локально"
+	@echo "  make mocks          - Генерация GoMock-ов"
 	@echo "  make up             - Запуск Docker Compose (Go + PostgreSQL)"
 	@echo "  make down           - Остановка контейнеров"
 	@echo "  make clean          - Полная очистка контейнеров, образов и томов"

@@ -30,6 +30,7 @@ func TestConfig(t *testing.T) {
 		wantSecretKey       string
 		wantAuditFile       string
 		wantAuditURL        string
+		wantTrustedSubnet   string
 	}{
 		{
 			name:                "defaults only",
@@ -233,6 +234,64 @@ func TestConfig(t *testing.T) {
 			wantAuditFile:       "/var/log/env_audit.log",
 			wantAuditURL:        "http://env-audit-server:8080",
 		},
+		{
+			name: "trusted subnet from flag",
+			args: []string{"cmd", "-t=192.168.0.0/24"},
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
+			wantBaseURL:         "http://localhost:8080",
+			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+			wantTrustedSubnet:   "192.168.0.0/24",
+		},
+		{
+			name: "trusted subnet env overrides flag",
+			args: []string{"cmd", "-t=192.168.0.0/24"},
+			env: map[string]string{
+				"SECRET_KEY":     "secret_key",
+				"TRUSTED_SUBNET": "10.0.0.0/8",
+			},
+			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
+			wantBaseURL:         "http://localhost:8080",
+			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+			wantTrustedSubnet:   "10.0.0.0/8",
+		},
+		{
+			name:       "trusted subnet from config file",
+			args:       []string{"cmd", "-c=config.json"},
+			configJSON: `{"trusted_subnet":"172.16.0.0/12"}`,
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+			wantAddress:         "localhost:8080",
+			wantEnableHTTPS:     false,
+			wantBaseURL:         "http://localhost:8080",
+			wantFileStoragePath: "./runtime/storage",
+			wantDatabaseDsn:     "",
+			wantSecretKey:       "secret_key",
+			wantAuditFile:       "",
+			wantAuditURL:        "",
+			wantTrustedSubnet:   "172.16.0.0/12",
+		},
+		{
+			name:      "invalid trusted subnet returns error",
+			args:      []string{"cmd", "-t=invalid"},
+			wantError: "invalid trusted subnet",
+			env: map[string]string{
+				"SECRET_KEY": "secret_key",
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -285,6 +344,7 @@ func TestConfig(t *testing.T) {
 			assert.Equal(t, tt.wantSecretKey, cfg.SecretKey)
 			assert.Equal(t, tt.wantAuditFile, cfg.AuditFile)
 			assert.Equal(t, tt.wantAuditURL, cfg.AuditURL)
+			assert.Equal(t, tt.wantTrustedSubnet, cfg.TrustedSubnet)
 		})
 	}
 }

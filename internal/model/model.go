@@ -85,3 +85,11 @@ type UserURLsResponse struct {
 	// ShortURL — короткая ссылка.
 	ShortURL string `json:"short_url"`
 }
+
+// StatsResponse представляет агрегированную статистику сервиса.
+type StatsResponse struct {
+	// URLs — количество сокращенных URL в сервисе.
+	URLs int `json:"urls"`
+	// Users — количество пользователей в сервисе.
+	Users int `json:"users"`
+}

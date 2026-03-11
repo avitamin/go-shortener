@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ import (
 //   - GET /api/user/urls          - Получение всех ссылок пользователя
 //   - DELETE /api/user/urls       - Удаление ссылок пользователя
 //   - GET /ping                   - Проверка доступности сервиса
+//   - GET /api/internal/stats     - Внутренняя статистика (доступ из trusted subnet)
 func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 	log, err := logger.New()
 	if err != nil {
@@ -352,6 +354,34 @@ func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	rtr.Get("/api/internal/stats", func(w http.ResponseWriter, r *http.Request) {
+		if !isTrustedRequest(r, svc.Config.TrustedSubnet) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+
+		urls, users, err := svc.GetStats(r.Context())
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		respBytes, err := json.Marshal(model.StatsResponse{
+			URLs:  urls,
+			Users: users,
+		})
+		if err != nil {
+			log.Error(err.Error())
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		w.Write(respBytes)
+	})
+
 	return rtr, nil
 }
 
@@ -365,4 +395,22 @@ func validateOriginalURL(orig string) error {
 	}
 
 	return nil
+}
+
+func isTrustedRequest(r *http.Request, trustedSubnet string) bool {
+	if trustedSubnet == "" {
+		return false
+	}
+
+	clientIP := net.ParseIP(strings.TrimSpace(r.Header.Get("X-Real-IP")))
+	if clientIP == nil {
+		return false
+	}
+
+	_, subnet, err := net.ParseCIDR(trustedSubnet)
+	if err != nil {
+		return false
+	}
+
+	return subnet.Contains(clientIP)
 }

@@ -172,6 +172,11 @@ func (r *fileStorageRepositoy) DeleteUserURLs(ctx context.Context, userID string
 	return nil
 }
 
+// GetStats возвращает агрегированную статистику по URL и пользователям.
+func (r *fileStorageRepositoy) GetStats(ctx context.Context) (urls int, users int, err error) {
+	return r.storage.GetStats(ctx)
+}
+
 // Close закрывает файл хранилища, сбрасывая все буферизованные данные на диск.
 func (r *fileStorageRepositoy) Close() error {
 	r.mu.Lock()
