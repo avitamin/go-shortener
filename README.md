@@ -100,3 +100,45 @@ Showing nodes accounting for -105.79MB, 5.68% of 1862.53MB total
 Отрицательные значения в профиле подтверждают успешную оптимизацию - использование памяти уменьшилось на **27.59%**!
 
 **Главный урок**: 95% выигрыша пришло от удаления избыточного логирования из горячих путей кода.
+
+## gRPC API
+
+Сервис поддерживает gRPC параллельно с HTTP.
+
+- gRPC endpoint по умолчанию: `localhost:9090`
+- Конфиг: `GRPC_SERVER_ADDRESS` / `grpc_server_address` / флаг `-ga`
+- TLS для gRPC управляется тем же параметром `ENABLE_HTTPS` (или `-s`), что и для HTTP.
+- Для авторизации используйте metadata header `authorization` со значением `Bearer <userID|signature>` или `<userID|signature>`.
+
+Пример `grpcurl` для получения URL пользователя:
+
+```bash
+grpcurl -plaintext \
+  -H 'authorization: Bearer <userID|signature>' \
+  localhost:9090 shortener.ShortenerService/ListUserURLs
+```
+
+## Smoke и Integration как отдельное приложение
+
+Добавлено отдельное CLI-приложение для проверок: `cmd/testsuite`.
+
+- smoke: базовая проверка жизнеспособности HTTP + gRPC (`shorten`, `expand`, `redirect`)
+- integration: кросс-протокольный сценарий и проверка авторизации gRPC через metadata `authorization`
+
+Примеры запуска:
+
+```bash
+go run ./cmd/testsuite -mode=smoke
+go run ./cmd/testsuite -mode=integration
+```
+
+Через `make`:
+
+```bash
+make smoke-test
+make integration-test
+```
+
+Эти `make`-таргеты по умолчанию ориентированы на параметры `make go-run`:
+- HTTP: `http://localhost:8099`
+- gRPC: `localhost:9090`

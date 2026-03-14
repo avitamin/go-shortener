@@ -14,6 +14,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"google.golang.org/grpc"
 )
 
 // launchServer запускает HTTP или HTTPS-сервер.
@@ -24,22 +26,56 @@ func launchServer(server *http.Server, enableHTTPS bool) error {
 		return server.ListenAndServe()
 	}
 
-	cert, err := generateSelfSignedCertificate(server.Addr)
+	listener, err := createTLSListener(server.Addr)
 	if err != nil {
-		return fmt.Errorf("generating TLS certificate: %w", err)
-	}
-
-	listener, err := tls.Listen("tcp", server.Addr, &tls.Config{
-		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
-	})
-	if err != nil {
-		return fmt.Errorf("creating TLS listener: %w", err)
+		return err
 	}
 
 	log.Printf("HTTPS включен для адреса %s\n", server.Addr)
 	log.Println("Используется самоподписанный сертификат, сгенерированный при запуске: браузер может показать предупреждение о безопасности")
 	return server.Serve(listener)
+}
+
+// launchGRPCServer запускает gRPC сервер с TCP или TLS listener.
+func launchGRPCServer(server *grpc.Server, address string, enableHTTPS bool) error {
+	var (
+		listener net.Listener
+		err      error
+	)
+
+	if !enableHTTPS {
+		listener, err = net.Listen("tcp", address)
+		if err != nil {
+			return fmt.Errorf("creating gRPC listener: %w", err)
+		}
+
+		return server.Serve(listener)
+	}
+
+	listener, err = createTLSListener(address)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("gRPC TLS включен для адреса %s\n", address)
+	return server.Serve(listener)
+}
+
+func createTLSListener(address string) (net.Listener, error) {
+	cert, err := generateSelfSignedCertificate(address)
+	if err != nil {
+		return nil, fmt.Errorf("generating TLS certificate: %w", err)
+	}
+
+	listener, err := tls.Listen("tcp", address, &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("creating TLS listener: %w", err)
+	}
+
+	return listener, nil
 }
 
 func generateSelfSignedCertificate(addr string) (tls.Certificate, error) {
