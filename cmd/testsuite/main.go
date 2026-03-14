@@ -75,7 +75,7 @@ func run(ctx context.Context, cfg cliConfig) error {
 		return fmt.Errorf("create http client: %w", err)
 	}
 
-	grpcConn, err := newGRPCConn(ctx, cfg)
+	grpcConn, err := newGRPCConn(cfg)
 	if err != nil {
 		return fmt.Errorf("connect gRPC: %w", err)
 	}
@@ -188,7 +188,7 @@ func newHTTPClient(insecureTLS bool) (*http.Client, error) {
 	return client, nil
 }
 
-func newGRPCConn(ctx context.Context, cfg cliConfig) (*grpc.ClientConn, error) {
+func newGRPCConn(cfg cliConfig) (*grpc.ClientConn, error) {
 	dialOpts := []grpc.DialOption{}
 	if cfg.UseTLS {
 		tlsCfg := &tls.Config{InsecureSkipVerify: cfg.InsecureTLS} //nolint:gosec // self-signed certs are expected in local runtime
@@ -197,7 +197,7 @@ func newGRPCConn(ctx context.Context, cfg cliConfig) (*grpc.ClientConn, error) {
 		dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
 
-	return grpc.DialContext(ctx, cfg.GRPCAddress, dialOpts...)
+	return grpc.NewClient(cfg.GRPCAddress, dialOpts...)
 }
 
 func shortenHTTP(ctx context.Context, client *http.Client, baseURL, original string) (string, error) {
