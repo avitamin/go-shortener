@@ -88,6 +88,7 @@ func main() {
 	defer stop()
 
 	<-baseShutdownCtx.Done()
+	stop()
 	shutdownStartedAt := time.Now()
 	appLogger.Info("shutdown signal received, starting graceful shutdown")
 
