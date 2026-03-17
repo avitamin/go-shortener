@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -17,12 +15,14 @@ import (
 	grpcserver "github.com/avitamin/go-shortener/internal/grpc"
 	pb "github.com/avitamin/go-shortener/internal/grpc/pb"
 	"github.com/avitamin/go-shortener/internal/handler"
+	projectlogger "github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
@@ -33,23 +33,32 @@ var buildCommit string
 const gracefulShutdownTimeout = 30 * time.Second
 
 func main() {
-	fmt.Printf("Build version: %s\n", valueOrNA(buildVersion))
-	fmt.Printf("Build date: %s\n", valueOrNA(buildDate))
-	fmt.Printf("Build commit: %s\n", valueOrNA(buildCommit))
+	appLogger, err := projectlogger.New()
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		_ = appLogger.Sync()
+	}()
+
+	appLogger.Info("build info")
+	appLogger.Info("version", zap.String("value", valueOrNA(buildVersion)))
+	appLogger.Info("date", zap.String("value", valueOrNA(buildDate)))
+	appLogger.Info("commit", zap.String("value", valueOrNA(buildCommit)))
 
 	cfg, err := config.New(true)
 	if err != nil {
-		log.Fatalf("configuration creating error: %v", err)
+		appLogger.Fatal("configuration creating error", zap.Error(err))
 	}
 
-	repo := initRepository(cfg)
+	repo := initRepository(cfg, appLogger)
 	defer repo.Close()
 
 	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {
-		log.Fatalf("router creating error: %v", err)
+		appLogger.Fatal("router creating error", zap.Error(err))
 	}
 
 	httpServer := &http.Server{
@@ -61,18 +70,18 @@ func main() {
 	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(grpcserver.UnaryAuthInterceptor(cfg.SecretKey)))
 	pb.RegisterShortenerServiceServer(grpcSrv, grpcTransport)
 
-	log.Printf("Запускаем HTTP сервер по адресу %s\n", cfg.Address)
-	log.Printf("Запускаем gRPC сервер по адресу %s\n", cfg.GRPCAddress)
+	appLogger.Info("starting HTTP server", zap.String("address", cfg.Address))
+	appLogger.Info("starting gRPC server", zap.String("address", cfg.GRPCAddress))
 
 	go func() {
 		if err := launchServer(httpServer, cfg.EnableHTTPS); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Fatalf("http server launching error: %v", err)
+			appLogger.Fatal("http server launching error", zap.Error(err))
 		}
 	}()
 
 	go func() {
 		if err := launchGRPCServer(grpcSrv, cfg.GRPCAddress, cfg.EnableHTTPS); err != nil && !errors.Is(err, grpc.ErrServerStopped) {
-			log.Fatalf("gRPC server launching error: %v", err)
+			appLogger.Fatal("gRPC server launching error", zap.Error(err))
 		}
 	}()
 
@@ -84,7 +93,7 @@ func main() {
 	defer httpCancel()
 
 	if err := httpServer.Shutdown(httpShutdownCtx); err != nil {
-		log.Printf("http server shutdown error: %v", err)
+		appLogger.Error("http server shutdown error", zap.Error(err))
 	}
 
 	shutdownGRPCServer(grpcSrv, gracefulShutdownTimeout)
@@ -93,34 +102,34 @@ func main() {
 	defer serviceCancel()
 
 	if err := svc.Shutdown(serviceShutdownCtx); err != nil {
-		log.Printf("service shutdown error: %v", err)
+		appLogger.Error("service shutdown error", zap.Error(err))
 	}
 }
 
-func initRepository(cfg *config.Config) repository.Repository {
+func initRepository(cfg *config.Config, appLogger *zap.Logger) repository.Repository {
 	if cfg.DatabaseDsn != "" {
 		db, err := sql.Open("pgx", cfg.DatabaseDsn)
 		if err != nil {
-			log.Fatalf("database connection opening error: %v", err)
+			appLogger.Fatal("database connection opening error", zap.Error(err))
 		}
 
 		driver, err := postgres.WithInstance(db, &postgres.Config{})
 		if err != nil {
 			_ = db.Close()
-			log.Fatalf("database driver creating error: %v", err)
+			appLogger.Fatal("database driver creating error", zap.Error(err))
 		}
 
 		m, err := migrate.NewWithDatabaseInstance("file://migrations", "postgres", driver)
 		if err != nil {
 			_ = db.Close()
-			log.Fatalf("migrations applying error: %v", err)
+			appLogger.Fatal("migrations applying error", zap.Error(err))
 		}
 		_ = m.Up()
 
 		repo, err := repository.NewDataBaseRepository(db)
 		if err != nil {
 			_ = db.Close()
-			log.Fatalf("repository creating error: %v", err)
+			appLogger.Fatal("repository creating error", zap.Error(err))
 		}
 
 		return repo
@@ -129,7 +138,7 @@ func initRepository(cfg *config.Config) repository.Repository {
 	if cfg.FileStoragePath != "" {
 		repo, err := repository.NewFileStorageRepository(cfg.FileStoragePath)
 		if err != nil {
-			log.Fatalf("repository creating error: %v", err)
+			appLogger.Fatal("repository creating error", zap.Error(err))
 		}
 
 		return repo
