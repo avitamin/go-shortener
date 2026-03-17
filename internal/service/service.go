@@ -7,16 +7,17 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
-	"log"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/avitamin/go-shortener/internal/audit"
 	"github.com/avitamin/go-shortener/internal/config"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/avitamin/go-shortener/internal/repository"
+	"go.uber.org/zap"
 )
 
 // ErrNoUserIDInContext возвращается, когда в контексте отсутствует идентификатор пользователя.
@@ -35,6 +36,8 @@ type ShortenerService struct {
 	deleteUserURLs chan DeleteUserURLs
 	deleteQueue    *deleteQueue
 	stopWorkers    chan struct{}
+	isShuttingDown atomic.Bool
+	logger         *zap.Logger
 	workersWG      sync.WaitGroup
 	shutdownOnce   sync.Once
 	// Audit — сервис аудита для логирования операций.
@@ -52,12 +55,22 @@ type DeleteUserURLs struct {
 // NewShortenerService создает новый экземпляр ShortenerService с указанным репозиторием,
 // конфигурацией и сервисом аудита, а также запускает фоновые воркеры для удаления URL.
 func NewShortenerService(repo repository.Repository, config *config.Config, auditService *audit.Service) *ShortenerService {
+	return NewShortenerServiceWithLogger(repo, config, auditService, zap.NewNop())
+}
+
+// NewShortenerServiceWithLogger создает новый экземпляр ShortenerService с внедренным логгером.
+func NewShortenerServiceWithLogger(repo repository.Repository, config *config.Config, auditService *audit.Service, logger *zap.Logger) *ShortenerService {
+	if logger == nil {
+		logger = zap.NewNop()
+	}
+
 	instance := &ShortenerService{
 		repo:           repo,
 		Config:         config,
 		deleteUserURLs: make(chan DeleteUserURLs, 10),
 		deleteQueue:    newDeleteQueue(),
 		stopWorkers:    make(chan struct{}),
+		logger:         logger,
 		Audit:          auditService,
 	}
 
@@ -231,6 +244,9 @@ func (s *ShortenerService) GetUserURLs(ctx context.Context) ([]model.URL, error)
 // Извлекает идентификатор пользователя из контекста.
 // Возвращает ErrNoUserIDInContext, если пользователь не аутентифицирован.
 func (s *ShortenerService) DeleteUserURLs(ctx context.Context, shortURLs []string) error {
+	if s.isShuttingDown.Load() {
+		return ErrServiceShuttingDown
+	}
 
 	select {
 	case <-ctx.Done():
@@ -292,7 +308,10 @@ func (s *ShortenerService) deleteWorker() {
 		select {
 		case deleteReq := <-s.deleteUserURLs:
 			s.enqueueDelete(deleteReq)
-			log.Printf("Queued %d URLs for deletion for user %s", len(deleteReq.ShortURLs), deleteReq.UserID)
+			s.logger.Info("queued URLs for deletion",
+				zap.Int("urls_count", len(deleteReq.ShortURLs)),
+				zap.String("user_id", deleteReq.UserID),
+			)
 		case <-ticker.C:
 			s.flushDeleteQueueOnce()
 		case <-s.stopWorkers:
@@ -306,7 +325,11 @@ func (s *ShortenerService) flushDeleteUserURLs(userID string, shortURLs []string
 	ctx := context.Background()
 	err := s.repo.DeleteUserURLs(ctx, userID, shortURLs)
 	if err != nil {
-		log.Printf("Error deleting URLs for user %s: %v", userID, err)
+		s.logger.Error("failed to delete URLs for user",
+			zap.String("user_id", userID),
+			zap.Int("urls_count", len(shortURLs)),
+			zap.Error(err),
+		)
 		return err
 	}
 
@@ -355,10 +378,12 @@ func (s *ShortenerService) pendingDeleteCount() int {
 func (s *ShortenerService) flushDeleteQueueOnce() {
 	batch := s.popDeleteBatch()
 	for userID, shortURLs := range batch {
-		log.Printf("Flushing deletion of %v for user %s", shortURLs, userID)
+		s.logger.Info("flushing queued URL deletions",
+			zap.String("user_id", userID),
+			zap.Int("urls_count", len(shortURLs)),
+		)
 
 		if err := s.flushDeleteUserURLs(userID, shortURLs); err != nil {
-			log.Printf("Error deleting URLs for user %s: %v", userID, err)
 			s.enqueueDelete(DeleteUserURLs{
 				ShortURLs: shortURLs,
 				UserID:    userID,
@@ -401,7 +426,12 @@ func (s *ShortenerService) flushDeleteQueueUntilEmpty(ctx context.Context) error
 
 // Shutdown останавливает фоновые воркеры и дожидается сохранения накопленных удалений.
 func (s *ShortenerService) Shutdown(ctx context.Context) error {
+	startedAt := time.Now()
+	s.logger.Info("service shutdown started")
+
 	s.shutdownOnce.Do(func() {
+		s.isShuttingDown.Store(true)
+		s.logger.Info("service shutdown: stop signal sent to delete workers")
 		close(s.stopWorkers)
 	})
 
@@ -411,20 +441,29 @@ func (s *ShortenerService) Shutdown(ctx context.Context) error {
 		close(workersDone)
 	}()
 
+	s.logger.Info("service shutdown: waiting for delete workers to stop")
 	select {
 	case <-ctx.Done():
+		s.logger.Error("service shutdown canceled while waiting workers", zap.Error(ctx.Err()))
 		return ctx.Err()
 	case <-workersDone:
+		s.logger.Info("service shutdown: delete workers stopped")
 	}
 
+	s.logger.Info("service shutdown: flushing pending delete queue")
 	if err := s.flushDeleteQueueUntilEmpty(ctx); err != nil {
+		s.logger.Error("service shutdown failed while flushing pending delete queue", zap.Error(err))
 		return err
 	}
+	s.logger.Info("service shutdown: delete queue flushed")
 
 	if s.Audit != nil {
+		s.logger.Info("service shutdown: closing audit service")
 		s.Audit.Close()
+		s.logger.Info("service shutdown: audit service closed")
 	}
 
+	s.logger.Info("service shutdown completed", zap.Duration("duration", time.Since(startedAt)))
 	return nil
 }
 

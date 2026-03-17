@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"net/http"
-	"os"
 	"os/signal"
 	"syscall"
 	"time"
@@ -54,7 +53,7 @@ func main() {
 	repo := initRepository(cfg, appLogger)
 	defer repo.Close()
 
-	svc := service.NewShortenerService(repo, cfg, audit.NewServiceFromConfig(cfg))
+	svc := service.NewShortenerServiceWithLogger(repo, cfg, audit.NewServiceFromConfig(cfg), appLogger)
 
 	rtr, err := handler.NewRouter(svc)
 	if err != nil {
@@ -85,25 +84,38 @@ func main() {
 		}
 	}()
 
-	stop := make(chan os.Signal, 1)
-	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-	<-stop
+	baseShutdownCtx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+	defer stop()
 
-	httpShutdownCtx, httpCancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+	<-baseShutdownCtx.Done()
+	shutdownStartedAt := time.Now()
+	appLogger.Info("shutdown signal received, starting graceful shutdown")
+
+	httpShutdownCtx, httpCancel := context.WithTimeout(context.WithoutCancel(baseShutdownCtx), gracefulShutdownTimeout)
 	defer httpCancel()
 
+	appLogger.Info("shutting down HTTP server", zap.Duration("timeout", gracefulShutdownTimeout))
 	if err := httpServer.Shutdown(httpShutdownCtx); err != nil {
 		appLogger.Error("http server shutdown error", zap.Error(err))
+	} else {
+		appLogger.Info("HTTP server shutdown completed")
 	}
 
+	appLogger.Info("shutting down gRPC server", zap.Duration("timeout", gracefulShutdownTimeout))
 	shutdownGRPCServer(grpcSrv, gracefulShutdownTimeout)
+	appLogger.Info("gRPC server shutdown completed")
 
-	serviceShutdownCtx, serviceCancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
+	serviceShutdownCtx, serviceCancel := context.WithTimeout(context.WithoutCancel(baseShutdownCtx), gracefulShutdownTimeout)
 	defer serviceCancel()
 
+	appLogger.Info("shutting down service background workers", zap.Duration("timeout", gracefulShutdownTimeout))
 	if err := svc.Shutdown(serviceShutdownCtx); err != nil {
 		appLogger.Error("service shutdown error", zap.Error(err))
+	} else {
+		appLogger.Info("service shutdown completed")
 	}
+
+	appLogger.Info("graceful shutdown completed", zap.Duration("duration", time.Since(shutdownStartedAt)))
 }
 
 func initRepository(cfg *config.Config, appLogger *zap.Logger) repository.Repository {
