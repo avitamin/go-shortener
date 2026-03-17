@@ -30,6 +30,8 @@ var buildVersion string
 var buildDate string
 var buildCommit string
 
+const gracefulShutdownTimeout = 30 * time.Second
+
 func main() {
 	fmt.Printf("Build version: %s\n", valueOrNA(buildVersion))
 	fmt.Printf("Build date: %s\n", valueOrNA(buildDate))
@@ -78,16 +80,16 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	<-stop
 
-	httpShutdownCtx, httpCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	httpShutdownCtx, httpCancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
 	defer httpCancel()
 
 	if err := httpServer.Shutdown(httpShutdownCtx); err != nil {
 		log.Printf("http server shutdown error: %v", err)
 	}
 
-	shutdownGRPCServer(grpcSrv, 10*time.Second)
+	shutdownGRPCServer(grpcSrv, gracefulShutdownTimeout)
 
-	serviceShutdownCtx, serviceCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	serviceShutdownCtx, serviceCancel := context.WithTimeout(context.Background(), gracefulShutdownTimeout)
 	defer serviceCancel()
 
 	if err := svc.Shutdown(serviceShutdownCtx); err != nil {
