@@ -32,12 +32,12 @@ func TestShortenURLAndExpandURL(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	_, err := client.ShortenURL(ctx, &pb.URLShortenRequest{Url: "invalid"})
+	_, err := client.ShortenURL(ctx, pb.URLShortenRequest_builder{Url: "invalid"}.Build())
 	if status.Code(err) != codes.InvalidArgument {
 		t.Fatalf("expected InvalidArgument, got %v", status.Code(err))
 	}
 
-	shortResp, err := client.ShortenURL(ctx, &pb.URLShortenRequest{Url: "https://example.com/grpc"})
+	shortResp, err := client.ShortenURL(ctx, pb.URLShortenRequest_builder{Url: "https://example.com/grpc"}.Build())
 	if err != nil {
 		t.Fatalf("shorten failed: %v", err)
 	}
@@ -47,7 +47,7 @@ func TestShortenURLAndExpandURL(t *testing.T) {
 		t.Fatalf("invalid shortened url: %s", shortResp.GetResult())
 	}
 
-	expandResp, err := client.ExpandURL(ctx, &pb.URLExpandRequest{Id: parts[len(parts)-1]})
+	expandResp, err := client.ExpandURL(ctx, pb.URLExpandRequest_builder{Id: parts[len(parts)-1]}.Build())
 	if err != nil {
 		t.Fatalf("expand failed: %v", err)
 	}
@@ -64,7 +64,7 @@ func TestListUserURLsRequiresAuthorization(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	_, err := client.ListUserURLs(ctx, &pb.ListUserURLsRequest{})
+	_, err := client.ListUserURLs(ctx, pb.ListUserURLsRequest_builder{}.Build())
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("expected Unauthenticated, got %v", status.Code(err))
 	}
@@ -90,7 +90,7 @@ func TestListUserURLsWithAuthorization(t *testing.T) {
 
 	ctx3, cancel3 := context.WithTimeout(authCtx, 3*time.Second)
 	defer cancel3()
-	resp, err := client.ListUserURLs(ctx3, &pb.ListUserURLsRequest{})
+	resp, err := client.ListUserURLs(ctx3, pb.ListUserURLsRequest_builder{}.Build())
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}

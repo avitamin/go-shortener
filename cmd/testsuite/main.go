@@ -105,7 +105,7 @@ func runSmoke(ctx context.Context, httpClient *http.Client, grpcClient pb.Shorte
 		return fmt.Errorf("smoke: parse short id: %w", err)
 	}
 
-	expanded, err := grpcClient.ExpandURL(ctx, &pb.URLExpandRequest{Id: shortID})
+	expanded, err := grpcClient.ExpandURL(ctx, pb.URLExpandRequest_builder{Id: shortID}.Build())
 	if err != nil {
 		return fmt.Errorf("smoke: grpc expand failed: %w", err)
 	}
@@ -138,18 +138,18 @@ func runIntegration(ctx context.Context, httpClient *http.Client, grpcClient pb.
 
 	authCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", "Bearer "+token))
 
-	if _, err := grpcClient.ListUserURLs(ctx, &pb.ListUserURLsRequest{}); err == nil || status.Code(err) != codes.Unauthenticated {
+	if _, err := grpcClient.ListUserURLs(ctx, pb.ListUserURLsRequest_builder{}.Build()); err == nil || status.Code(err) != codes.Unauthenticated {
 		return fmt.Errorf("integration: expected Unauthenticated without metadata, got %v", err)
 	}
 	log.Printf("integration: gRPC unauthenticated check ok")
 
-	if _, err := grpcClient.ListUserURLs(authCtx, &pb.ListUserURLsRequest{}); err != nil {
+	if _, err := grpcClient.ListUserURLs(authCtx, pb.ListUserURLsRequest_builder{}.Build()); err != nil {
 		return fmt.Errorf("integration: authorized ListUserURLs failed: %w", err)
 	}
 	log.Printf("integration: gRPC authorized ListUserURLs ok")
 
 	originalGRPC := fmt.Sprintf("https://example.com/integration-grpc-%d", time.Now().UnixNano())
-	grpcShort, err := grpcClient.ShortenURL(authCtx, &pb.URLShortenRequest{Url: originalGRPC})
+	grpcShort, err := grpcClient.ShortenURL(authCtx, pb.URLShortenRequest_builder{Url: originalGRPC}.Build())
 	if err != nil {
 		return fmt.Errorf("integration: grpc shorten failed: %w", err)
 	}

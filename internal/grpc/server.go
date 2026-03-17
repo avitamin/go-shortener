@@ -44,7 +44,7 @@ func (s *Server) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb
 	}
 
 	if short, ok := s.svc.GetShort(ctx, orig); ok {
-		return &pb.URLShortenResponse{Result: short}, nil
+		return pb.URLShortenResponse_builder{Result: short}.Build(), nil
 	}
 
 	short, err := s.svc.Shorten(ctx, orig)
@@ -52,7 +52,7 @@ func (s *Server) ShortenURL(ctx context.Context, req *pb.URLShortenRequest) (*pb
 		return nil, status.Error(codes.Internal, "failed to shorten url")
 	}
 
-	return &pb.URLShortenResponse{Result: short}, nil
+	return pb.URLShortenResponse_builder{Result: short}.Build(), nil
 }
 
 // ExpandURL resolves short URL id into original URL.
@@ -78,7 +78,7 @@ func (s *Server) ExpandURL(_ context.Context, req *pb.URLExpandRequest) (*pb.URL
 		}
 	}
 
-	return &pb.URLExpandResponse{Result: original}, nil
+	return pb.URLExpandResponse_builder{Result: original}.Build(), nil
 }
 
 // ListUserURLs returns URLs created by authenticated user.
@@ -93,15 +93,15 @@ func (s *Server) ListUserURLs(ctx context.Context, _ *pb.ListUserURLsRequest) (*
 		}
 	}
 
-	resp := &pb.UserURLsResponse{Url: make([]*pb.URLData, 0, len(urls))}
+	respItems := make([]*pb.URLData, 0, len(urls))
 	for _, it := range urls {
-		resp.Url = append(resp.Url, &pb.URLData{
+		respItems = append(respItems, pb.URLData_builder{
 			ShortUrl:    it.Short,
 			OriginalUrl: it.Original,
-		})
+		}.Build())
 	}
 
-	return resp, nil
+	return pb.UserURLsResponse_builder{Url: respItems}.Build(), nil
 }
 
 // UnaryAuthInterceptor injects user ID from metadata authorization token.

@@ -30,7 +30,13 @@ lint:
 ## 📦 Генерация protobuf/gRPC кода
 proto:
 	@echo "📦 Generating protobuf and gRPC code..."
-	protoc --go_out=. --go-grpc_out=. api/proto/shortener.proto
+	protoc \
+		--go_out=. \
+		--go_opt=module=github.com/avitamin/go-shortener \
+		--go_opt=default_api_level=API_OPAQUE \
+		--go-grpc_out=. \
+		--go-grpc_opt=module=github.com/avitamin/go-shortener \
+		api/proto/shortener.proto
 
 ## ✅ Smoke test (requires running app)
 smoke-test:
