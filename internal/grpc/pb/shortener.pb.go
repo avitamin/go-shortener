@@ -12,6 +12,13 @@ const _ = proto.ProtoPackageIsVersion4
 
 var _ = fmt.Errorf
 
+// ListUserURLsRequest contains optional filters for user URL listing.
+type ListUserURLsRequest struct{}
+
+func (m *ListUserURLsRequest) Reset()         { *m = ListUserURLsRequest{} }
+func (m *ListUserURLsRequest) String() string { return proto.CompactTextString(m) }
+func (*ListUserURLsRequest) ProtoMessage()    {}
+
 // URLShortenRequest contains original URL.
 type URLShortenRequest struct {
 	Url string `protobuf:"bytes,1,opt,name=url,proto3" json:"url,omitempty"`

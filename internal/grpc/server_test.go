@@ -21,7 +21,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const bufSize = 1024 * 1024
@@ -65,7 +64,7 @@ func TestListUserURLsRequiresAuthorization(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
-	_, err := client.ListUserURLs(ctx, &emptypb.Empty{})
+	_, err := client.ListUserURLs(ctx, &pb.ListUserURLsRequest{})
 	if status.Code(err) != codes.Unauthenticated {
 		t.Fatalf("expected Unauthenticated, got %v", status.Code(err))
 	}
@@ -91,7 +90,7 @@ func TestListUserURLsWithAuthorization(t *testing.T) {
 
 	ctx3, cancel3 := context.WithTimeout(authCtx, 3*time.Second)
 	defer cancel3()
-	resp, err := client.ListUserURLs(ctx3, &emptypb.Empty{})
+	resp, err := client.ListUserURLs(ctx3, &pb.ListUserURLsRequest{})
 	if err != nil {
 		t.Fatalf("list failed: %v", err)
 	}

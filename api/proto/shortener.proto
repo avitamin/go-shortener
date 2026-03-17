@@ -4,13 +4,13 @@ package shortener;
 
 option go_package = "github.com/avitamin/go-shortener/internal/grpc/pb;pb";
 
-import "google/protobuf/empty.proto";
-
 service ShortenerService {
   rpc ShortenURL (URLShortenRequest) returns (URLShortenResponse);
   rpc ExpandURL (URLExpandRequest) returns (URLExpandResponse);
-  rpc ListUserURLs (google.protobuf.Empty) returns (UserURLsResponse);
+  rpc ListUserURLs (ListUserURLsRequest) returns (UserURLsResponse);
 }
+
+message ListUserURLsRequest {}
 
 message URLShortenRequest {
   string url = 1;

@@ -15,7 +15,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Server is gRPC transport facade for ShortenerService.
@@ -83,7 +82,7 @@ func (s *Server) ExpandURL(_ context.Context, req *pb.URLExpandRequest) (*pb.URL
 }
 
 // ListUserURLs returns URLs created by authenticated user.
-func (s *Server) ListUserURLs(ctx context.Context, _ *emptypb.Empty) (*pb.UserURLsResponse, error) {
+func (s *Server) ListUserURLs(ctx context.Context, _ *pb.ListUserURLsRequest) (*pb.UserURLsResponse, error) {
 	urls, err := s.svc.GetUserURLs(ctx)
 	if err != nil {
 		switch {

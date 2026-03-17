@@ -23,7 +23,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const userCookieName = "user_id"
@@ -139,12 +138,12 @@ func runIntegration(ctx context.Context, httpClient *http.Client, grpcClient pb.
 
 	authCtx := metadata.NewOutgoingContext(ctx, metadata.Pairs("authorization", "Bearer "+token))
 
-	if _, err := grpcClient.ListUserURLs(ctx, &emptypb.Empty{}); err == nil || status.Code(err) != codes.Unauthenticated {
+	if _, err := grpcClient.ListUserURLs(ctx, &pb.ListUserURLsRequest{}); err == nil || status.Code(err) != codes.Unauthenticated {
 		return fmt.Errorf("integration: expected Unauthenticated without metadata, got %v", err)
 	}
 	log.Printf("integration: gRPC unauthenticated check ok")
 
-	if _, err := grpcClient.ListUserURLs(authCtx, &emptypb.Empty{}); err != nil {
+	if _, err := grpcClient.ListUserURLs(authCtx, &pb.ListUserURLsRequest{}); err != nil {
 		return fmt.Errorf("integration: authorized ListUserURLs failed: %w", err)
 	}
 	log.Printf("integration: gRPC authorized ListUserURLs ok")
