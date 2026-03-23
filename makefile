@@ -4,6 +4,12 @@ BUILD_VERSION?=dev
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 BUILD_COMMIT?=$(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 LDFLAGS=-X 'main.buildVersion=$(BUILD_VERSION)' -X 'main.buildDate=$(BUILD_DATE)' -X 'main.buildCommit=$(BUILD_COMMIT)'
+LOCAL_HTTP_ADDR?=localhost:8099
+LOCAL_GRPC_ADDR?=localhost:9090
+LOCAL_BASE_URL?=http://$(LOCAL_HTTP_ADDR)/
+LOCAL_DB_DSN?=postgres://postgres:postgres@localhost:54323/shortener?sslmode=disable
+TESTSUITE_HTTP_BASE_URL?=http://$(LOCAL_HTTP_ADDR)
+TESTSUITE_GRPC_ADDR?=$(LOCAL_GRPC_ADDR)
 
 # Цель по умолчанию
 .DEFAULT_GOAL := help
@@ -20,6 +26,32 @@ build:
 lint:
 	@echo "🔍 Running staticlint multichecker..."
 	@go run ./cmd/staticlint ./...
+
+## 📦 Генерация protobuf/gRPC кода
+proto:
+	@echo "📦 Generating protobuf and gRPC code..."
+	protoc \
+		--go_out=. \
+		--go_opt=module=github.com/avitamin/go-shortener \
+		--go_opt=default_api_level=API_OPAQUE \
+		--go-grpc_out=. \
+		--go-grpc_opt=module=github.com/avitamin/go-shortener \
+		api/proto/shortener.proto
+
+## ✅ Smoke test (requires running app)
+smoke-test:
+	@echo "✅ Running smoke testsuite..."
+	@go run ./cmd/testsuite -mode=smoke -http-base-url=$(TESTSUITE_HTTP_BASE_URL) -grpc-address=$(TESTSUITE_GRPC_ADDR)
+
+## 🧪 Integration test (requires running app)
+integration-test:
+	@echo "🧪 Running integration testsuite..."
+	@go run ./cmd/testsuite -mode=integration -http-base-url=$(TESTSUITE_HTTP_BASE_URL) -grpc-address=$(TESTSUITE_GRPC_ADDR)
+
+## 🧪 Обновление GoMock-ов
+mocks:
+	@echo "🧪 Generating mocks..."
+	@mockgen -source=internal/repository/repository.go -destination=internal/repository/mock/repository.mock.go -package=mock
 
 ## 🚀 Запуск docker-compose
 up:
@@ -45,7 +77,7 @@ psql:
 	@docker exec -it postgres_db psql -U postgres -d shortener
 
 go-run:
-	@go run -ldflags="$(LDFLAGS)" ./cmd/shortener/main.go -a=localhost:8099 -b=http://localhost:8099/ -d=postgres://postgres:postgres@localhost:54323/shortener?sslmode=disable
+	@go run -ldflags="$(LDFLAGS)" ./cmd/shortener -a=$(LOCAL_HTTP_ADDR) -ga=$(LOCAL_GRPC_ADDR) -b=$(LOCAL_BASE_URL) -d=$(LOCAL_DB_DSN)
 
 ## 📊 Запуск всех бенчмарков
 bench:
@@ -113,6 +145,7 @@ help:
 	@echo ""
 	@echo "Доступные команды:"
 	@echo "  make build          - Сборка Go бинарника локально"
+	@echo "  make mocks          - Генерация GoMock-ов"
 	@echo "  make up             - Запуск Docker Compose (Go + PostgreSQL)"
 	@echo "  make down           - Остановка контейнеров"
 	@echo "  make clean          - Полная очистка контейнеров, образов и томов"

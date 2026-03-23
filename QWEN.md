@@ -74,6 +74,7 @@ go run ./cmd/shortener/main.go -a=localhost:8099 -b=http://localhost:8099/ -d=po
 | `-b` | `BASE_URL` | Базовый URL для коротких URL | `http://localhost:8080` |
 | `-f` | `FILE_STORAGE_PATH` | Путь к файловому хранилищу | `./runtime/storage` |
 | `-d` | `DATABASE_DSN` | DSN базы данных | (нет) |
+| `-t` | `TRUSTED_SUBNET` | Доверенная подсеть CIDR для внутренней статистики | (нет) |
 | | `SECRET_KEY` | Секретный ключ для аутентификации | `secret_key` |
 | | `AUDIT_FILE` | Путь к файлу логов аудита | (нет) |
 | | `AUDIT_URL` | URL удаленного сервера аудита | (нет) |
@@ -121,6 +122,7 @@ services:
 - `GET /api/user/urls` - Получить URL пользователя
 - `DELETE /api/user/urls` - Удалить URL пользователя
 - `GET /ping` - Проверка работоспособности
+- `GET /api/internal/stats` - Внутренняя статистика (доступ по `X-Real-IP` из `trusted_subnet`)
 
 ### Бэкенды хранения
 Приложение поддерживает три варианта хранения:

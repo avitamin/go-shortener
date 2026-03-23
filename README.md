@@ -1,102 +1,143 @@
-# go-musthave-shortener-tpl
+# go-shortener
 
-Шаблон репозитория для трека «Сервис сокращения URL».
+Обновлено: 2026-03-14
 
-## Начало работы
+Сервис сокращения URL на Go с HTTP и gRPC интерфейсами.
 
-1. Склонируйте репозиторий в любую подходящую директорию на вашем компьютере.
-2. В корне репозитория выполните команду `go mod init <name>` (где `<name>` — адрес вашего репозитория на GitHub без префикса `https://`) для создания модуля.
+## Быстрый старт
 
-## Обновление шаблона
+### Требования
+- Go 1.24+
+- Docker + Docker Compose (для локального PostgreSQL)
 
-Чтобы иметь возможность получать обновления автотестов и других частей шаблона, выполните команду:
-
-```
-git remote add -m v2 template https://github.com/Yandex-Practicum/go-musthave-shortener-tpl.git
-```
-
-Для обновления кода автотестов выполните команду:
-
-```
-git fetch template && git checkout template/v2 .github
+### Запуск через Docker Compose
+```bash
+make up
 ```
 
-Затем добавьте полученные изменения в свой репозиторий.
+Приложение поднимется на `http://localhost:8099`, PostgreSQL на `localhost:54323`.
 
-## Запуск автотестов
-
-Для успешного запуска автотестов называйте ветки `iter<number>`, где `<number>` — порядковый номер инкремента. Например, в ветке с названием `iter4` запустятся автотесты для инкрементов с первого по четвёртый.
-
-При мёрже ветки с инкрементом в основную ветку `main` будут запускаться все автотесты.
-
-Подробнее про локальный и автоматический запуск читайте в [README автотестов](https://github.com/Yandex-Practicum/go-autotests).
-
-## Структура проекта
-
-Приведённая в этом репозитории структура проекта является рекомендуемой, но не обязательной.
-
-Это лишь пример организации кода, который поможет вам в реализации сервиса.
-
-При необходимости можно вносить изменения в структуру проекта, использовать любые библиотеки и предпочитаемые структурные паттерны организации кода приложения, например:
-- **DDD** (Domain-Driven Design)
-- **Clean Architecture**
-- **Hexagonal Architecture**
-- **Layered Architecture**
-
-## Анализ использования памяти
-
-Был проведен анализ использования памяти с помощью профилировщика pprof. Профили сохранены в директории `profiles/`.
-
-### Процесс оптимизации
-
-1. **Базовый профиль** (`profiles/base.pprof`) - исходное состояние проекта
-2. **Выявленные проблемы**:
-   - Избыточное логирование в `saveNoLock` - 98.50MB аллокаций
-   - Неэффективная конкатенация строк в `GetAbsoluteShortURL` - 109.50MB
-   - Создание новых буферов в `generateID` - 30.50MB
-3. **Внесенные оптимизации**:
-   - Удалено избыточное логирование из горячих путей кода
-   - Использован `strings.Builder` с предвыделением памяти в `GetAbsoluteShortURL`
-   - Применен `sync.Pool` для переиспользования буферов в `generateID`
-4. **Результирующий профиль** (`profiles/result.pprof`) - состояние после оптимизации
-
-### Результаты сравнения профилей
-
-Команда: `pprof -top -diff_base=profiles/base.pprof profiles/result.pprof`
-
-```
-File: service.test
-Type: alloc_space
-Showing nodes accounting for -105.79MB, 5.68% of 1862.53MB total
-      flat  flat%   sum%        cum   cum%
- -109.50MB  5.88%  5.88%    -2.50MB  0.13%  GetAbsoluteShortURL
-     107MB  5.75%  0.13%      107MB  5.75%  strings.(*Builder).grow
-  -80.29MB  4.31%  4.45%   -80.29MB  4.31%  saveNoLock
-  -30.50MB  1.64%  6.08%   -18.50MB  0.99%  generateID
-      12MB  0.64%  5.44%       12MB  0.64%  base64.EncodeToString
-  -11.50MB  0.62%  6.06%  -104.29MB  5.60%  BenchmarkShorten
-       8MB  0.43%  5.63%     8.50MB  0.46%  fmt.Sprintf
+### Запуск локально через Go
+```bash
+make go-run
 ```
 
-### Итоги оптимизации
+По умолчанию `make go-run` запускает:
+- HTTP: `localhost:8099`
+- gRPC: `localhost:9090`
+- BASE_URL: `http://localhost:8099/`
+- PostgreSQL: `postgres://postgres:postgres@localhost:54323/shortener?sslmode=disable`
 
-**Бенчмарк `BenchmarkShorten`:**
-- **До оптимизации**: 2423 ns/op, 531 B/op, 7 allocs/op
-- **После оптимизации**: 2135 ns/op, 309 B/op, 4 allocs/op
+## Основные команды
 
-**Улучшения:**
-- Время выполнения: **-11.9%** (288 ns/op быстрее) ⚡
-- Использование памяти: **-41.8%** (222 байта меньше) 💾
-- Количество аллокаций: **-42.9%** (с 7 до 4) 🎯
-- Общее снижение аллокаций памяти: **-513.84MB** (27.59% от общего объема) 🚀
+- `make build` — собрать `bin/shortener` с build-метаданными (`version/date/commit`)
+- `make lint` — запустить `go run ./cmd/staticlint ./...`
+- `go test ./...` — запустить unit/integration тесты Go
+- `make smoke-test` — smoke проверка HTTP+gRPC через `cmd/testsuite`
+- `make integration-test` — интеграционный сценарий cross-protocol
+- `make up` / `make down` — поднять/остановить Docker Compose
 
-**Ключевые достижения:**
-- ✅ Уменьшены аллокации в `saveNoLock` на **490.34MB** (удалено избыточное логирование) - **95.4%** выигрыша
-- ✅ Уменьшены аллокации в `generateID` на **18.50MB** (использован `sync.Pool`) - **3.6%** выигрыша
-- ✅ Уменьшены аллокации в `GetAbsoluteShortURL` на **2.50MB** реально (strings.Builder) - **0.5%** выигрыша
-- ✅ Количество аллокаций на операцию уменьшено с **7 до 4** (-42.9%)
-- ✅ Оптимизирована архитектура бенчмарков для переиспользования сервисов
+Подробно по тестам: [docs/tests/README.md](docs/tests/README.md)
 
-Отрицательные значения в профиле подтверждают успешную оптимизацию - использование памяти уменьшилось на **27.59%**!
+## Конфигурация
 
-**Главный урок**: 95% выигрыша пришло от удаления избыточного логирования из горячих путей кода.
+Конфигурация читается в порядке приоритета:
+`env > flags > config file > defaults`
+
+JSON-конфиг можно передать:
+- флагом `-c` или `-config`
+- переменной окружения `CONFIG`
+
+### Параметры
+
+| Флаг | Env | JSON | Описание | По умолчанию |
+|---|---|---|---|---|
+| `-a` | `SERVER_ADDRESS` | `server_address` | HTTP адрес | `localhost:8080` |
+| `-ga` | `GRPC_SERVER_ADDRESS` | `grpc_server_address` | gRPC адрес | `localhost:9090` |
+| `-b` | `BASE_URL` | `base_url` | Базовый URL для коротких ссылок | `http://localhost:8080` |
+| `-f` | `FILE_STORAGE_PATH` | `file_storage_path` | Файловое хранилище | `./runtime/storage` |
+| `-d` | `DATABASE_DSN` | `database_dsn` | PostgreSQL DSN | пусто |
+| `-s` | `ENABLE_HTTPS` | `enable_https` | Включить TLS для HTTP и gRPC | `false` |
+| `-t` | `TRUSTED_SUBNET` | `trusted_subnet` | CIDR для `/api/internal/stats` | пусто |
+| `-audit-file` | `AUDIT_FILE` | `audit_file` | Аудит в файл | пусто |
+| `-audit-url` | `AUDIT_URL` | `audit_url` | Аудит во внешний HTTP endpoint | пусто |
+| — | `SECRET_KEY` | `secret_key` | HMAC-ключ подписи user token | `secret_key` |
+
+Пример запуска с конфигом:
+```bash
+go run ./cmd/shortener -c=./runtime/config.json
+```
+
+## HTTP API
+
+### Эндпоинты
+- `POST /` — сократить URL (`text/plain`)
+- `GET /{id}` — редирект на оригинальный URL
+- `POST /api/shorten` — сократить URL (`application/json`)
+- `POST /api/shorten/batch` — пакетное сокращение
+- `GET /api/user/urls` — ссылки текущего пользователя
+- `DELETE /api/user/urls` — асинхронное удаление ссылок пользователя
+- `GET /ping` — health-check backend хранилища
+- `GET /api/internal/stats` — статистика (`{"urls":N,"users":M}`), доступ только из `TRUSTED_SUBNET` по `X-Real-IP`
+
+### Пример JSON сокращения
+```bash
+curl -i -X POST 'http://localhost:8099/api/shorten' \
+  -H 'Content-Type: application/json' \
+  -d '{"url":"https://example.com"}'
+```
+
+### Пример internal stats
+```bash
+curl -i 'http://localhost:8099/api/internal/stats' \
+  -H 'X-Real-IP: 127.0.0.1'
+```
+
+Важно: без `TRUSTED_SUBNET` endpoint вернёт `403 Forbidden`.
+
+## gRPC API
+
+Proto: [api/proto/shortener.proto](api/proto/shortener.proto)
+
+Сервис `ShortenerService`:
+- `ShortenURL(URLShortenRequest) returns (URLShortenResponse)`
+- `ExpandURL(URLExpandRequest) returns (URLExpandResponse)`
+- `ListUserURLs(google.protobuf.Empty) returns (UserURLsResponse)`
+
+### Авторизация в gRPC
+
+Метод `ListUserURLs` требует metadata `authorization`:
+- `Bearer <userID|signature>`
+- либо `<userID|signature>`
+
+`ShortenURL` и `ExpandURL` работают и без metadata.
+
+Пример:
+```bash
+grpcurl -plaintext \
+  -H 'authorization: Bearer <userID|signature>' \
+  localhost:9090 shortener.ShortenerService/ListUserURLs
+```
+
+## TLS / HTTPS
+
+При `-s` или `ENABLE_HTTPS=true`:
+- HTTP и gRPC запускаются с TLS;
+- сертификат генерируется self-signed на каждый старт процесса;
+- браузер/клиент может показывать предупреждение о недоверенном сертификате.
+
+Практика для локальной проверки — включать insecure TLS у клиентов (`cmd/testsuite` делает это по умолчанию).
+
+## Хранилище
+
+Выбор backend по конфигу:
+1. Если задан `DATABASE_DSN`, используется PostgreSQL (+ миграции из `migrations/`).
+2. Иначе, если задан `FILE_STORAGE_PATH`, используется файловое хранилище.
+3. Иначе используется in-memory репозиторий.
+
+## Документация по разделам
+
+- Архитектура: [QWEN.md](QWEN.md)
+- Тестирование: [docs/tests/README.md](docs/tests/README.md)
+- Docker: [docker/README.md](docker/README.md)
+- Правила для агентов и разработки: [AGENTS.md](AGENTS.md)

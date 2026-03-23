@@ -3,14 +3,11 @@ package middleware
 
 import (
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
-	"fmt"
 	"net/http"
 	"strings"
 
+	authn "github.com/avitamin/go-shortener/internal/auth"
 	"github.com/avitamin/go-shortener/internal/model"
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -56,7 +53,7 @@ func Auth(secret string, logger *zap.Logger) func(next http.Handler) http.Handle
 
 			userID := parts[0]
 			sig := parts[1]
-			if !verifySignature(userID, sig, secret) {
+			if !authn.VerifySignature(userID, sig, secret) {
 				// подпись некорректна -> сгенерируем новый userID и установим cookie
 				logger.Info("invalid cookie signature, issuing new cookie", zap.String("cookie_value", c.Value))
 				newID := uuid.New().String()
@@ -73,22 +70,10 @@ func Auth(secret string, logger *zap.Logger) func(next http.Handler) http.Handle
 	}
 }
 
-func computeHMAC(msg, secret string) string {
-	mac := hmac.New(sha256.New, []byte(secret))
-	mac.Write([]byte(msg))
-	return hex.EncodeToString(mac.Sum(nil))
-}
-
-func verifySignature(msg, sig, secret string) bool {
-	expected := computeHMAC(msg, secret)
-	return hmac.Equal([]byte(expected), []byte(sig))
-}
-
 func setSignedCookie(w http.ResponseWriter, userID, secret string) {
-	sig := computeHMAC(userID, secret)
 	cookie := &http.Cookie{
 		Name:  cookieName,
-		Value: fmt.Sprintf("%s|%s", userID, sig),
+		Value: authn.BuildSignedUserID(userID, secret),
 		Path:  "/",
 		// Session-only: не устанавливаем MaxAge или Expires
 		HttpOnly: true,

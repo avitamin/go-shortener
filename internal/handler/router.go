@@ -12,6 +12,7 @@ import (
 	"github.com/avitamin/go-shortener/internal/logger"
 	"github.com/avitamin/go-shortener/internal/repository"
 	"github.com/avitamin/go-shortener/internal/service"
+	"github.com/avitamin/go-shortener/internal/transport/validation"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/goccy/go-json"
@@ -32,6 +33,7 @@ import (
 //   - GET /api/user/urls          - Получение всех ссылок пользователя
 //   - DELETE /api/user/urls       - Удаление ссылок пользователя
 //   - GET /ping                   - Проверка доступности сервиса
+//   - GET /api/internal/stats     - Внутренняя статистика (доступ из trusted subnet)
 func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 	log, err := logger.New()
 	if err != nil {
@@ -352,17 +354,39 @@ func NewRouter(svc *service.ShortenerService) (http.Handler, error) {
 		w.WriteHeader(http.StatusOK)
 	})
 
+	rtr.Route("/api/internal", func(r chi.Router) {
+		r.Use(lclmw.RequireTrustedSubnet(svc.Config.TrustedSubnet))
+
+		r.Get("/stats", func(w http.ResponseWriter, r *http.Request) {
+			urls, users, err := svc.GetStats(r.Context())
+			if err != nil {
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			respBytes, err := json.Marshal(model.StatsResponse{
+				URLs:  urls,
+				Users: users,
+			})
+			if err != nil {
+				log.Error(err.Error())
+				http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+				return
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			w.Write(respBytes)
+		})
+	})
+
 	return rtr, nil
 }
 
 // ErrInvalidURL возвращается, когда URL не начинается с http:// или https://.
-var ErrInvalidURL = errors.New("некорректный url")
+var ErrInvalidURL = validation.ErrInvalidURL
 
 func validateOriginalURL(orig string) error {
-
-	if !strings.HasPrefix(orig, "http://") && !strings.HasPrefix(orig, "https://") {
-		return ErrInvalidURL
-	}
-
-	return nil
+	return validation.ValidateOriginalURL(orig)
 }

@@ -7,8 +7,10 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
+	"strings"
 
 	"github.com/caarlos0/env/v6"
 )
@@ -22,6 +24,9 @@ const DefaultAddress = "localhost:8080"
 // DefaultBaseURL — базовый URL сервиса по умолчанию.
 const DefaultBaseURL = "http://localhost:8080"
 
+// DefaultGRPCAddress — адрес gRPC-сервера по умолчанию.
+const DefaultGRPCAddress = "localhost:9090"
+
 // DefaultFileStoragePath — путь к файловому хранилищу по умолчанию.
 const DefaultFileStoragePath = "./runtime/storage"
 
@@ -29,6 +34,8 @@ const DefaultFileStoragePath = "./runtime/storage"
 type Config struct {
 	// Address — адрес и порт для запуска HTTP-сервера.
 	Address string `env:"SERVER_ADDRESS" json:"server_address"`
+	// GRPCAddress — адрес и порт для запуска gRPC-сервера.
+	GRPCAddress string `env:"GRPC_SERVER_ADDRESS" json:"grpc_server_address"`
 	// EnableHTTPS — включает запуск HTTPS-сервера.
 	EnableHTTPS bool `env:"ENABLE_HTTPS" json:"enable_https"`
 	// BaseURL — базовый URL для формирования коротких ссылок.
@@ -43,6 +50,8 @@ type Config struct {
 	AuditFile string `env:"AUDIT_FILE" json:"audit_file"`
 	// AuditURL — URL удаленного сервера для отправки логов аудита.
 	AuditURL string `env:"AUDIT_URL" json:"audit_url"`
+	// TrustedSubnet — доверенная подсеть в формате CIDR для внутренних эндпоинтов.
+	TrustedSubnet string `env:"TRUSTED_SUBNET" json:"trusted_subnet"`
 }
 
 // New создает новый экземпляр Config.
@@ -54,12 +63,14 @@ func New(withParse bool) (*Config, error) {
 	var configPath string
 
 	flag.StringVar(&cfg.Address, "a", DefaultAddress, "адрес сервера (например localhost:8080)")
+	flag.StringVar(&cfg.GRPCAddress, "ga", DefaultGRPCAddress, "адрес gRPC сервера (например localhost:9090)")
 	flag.StringVar(&cfg.BaseURL, "b", DefaultBaseURL, "базовый URL (например http://localhost:8080)")
 	flag.StringVar(&cfg.FileStoragePath, "f", DefaultFileStoragePath, "путь к файлу хранилища (например ./runtime/storage)")
 	flag.StringVar(&cfg.DatabaseDsn, "d", "", "DSN (например postgres://postgres:postgres@db:5432/postgres)")
 	flag.BoolVar(&cfg.EnableHTTPS, "s", false, "включить HTTPS")
 	flag.StringVar(&cfg.AuditFile, "audit-file", "", "путь к файлу для логов аудита")
 	flag.StringVar(&cfg.AuditURL, "audit-url", "", "URL удаленного сервера для логов аудита")
+	flag.StringVar(&cfg.TrustedSubnet, "t", "", "доверенная подсеть в формате CIDR (например 192.168.0.0/24)")
 	flag.StringVar(&configPath, "c", "", "путь к JSON-файлу конфигурации")
 	flag.StringVar(&configPath, "config", "", "путь к JSON-файлу конфигурации")
 
@@ -129,6 +140,11 @@ func applyFileConfig(cfg *Config, path string, flagsSet map[string]struct{}) err
 			apply:    func() { cfg.Address = fromFile.Address },
 		},
 		{
+			jsonName: "grpc_server_address",
+			canApply: func() bool { return shouldApplyFileValue("ga", "GRPC_SERVER_ADDRESS", flagsSet) },
+			apply:    func() { cfg.GRPCAddress = fromFile.GRPCAddress },
+		},
+		{
 			jsonName: "base_url",
 			canApply: func() bool { return shouldApplyFileValue("b", "BASE_URL", flagsSet) },
 			apply:    func() { cfg.BaseURL = fromFile.BaseURL },
@@ -162,6 +178,11 @@ func applyFileConfig(cfg *Config, path string, flagsSet map[string]struct{}) err
 			jsonName: "audit_url",
 			canApply: func() bool { return shouldApplyFileValue("audit-url", "AUDIT_URL", flagsSet) },
 			apply:    func() { cfg.AuditURL = fromFile.AuditURL },
+		},
+		{
+			jsonName: "trusted_subnet",
+			canApply: func() bool { return shouldApplyFileValue("t", "TRUSTED_SUBNET", flagsSet) },
+			apply:    func() { cfg.TrustedSubnet = fromFile.TrustedSubnet },
 		},
 	}
 
@@ -220,8 +241,34 @@ func (c *Config) Validate() error {
 		return ErrSecretKeyReq
 	}
 
+	if err := validateAddress(c.Address, "server address"); err != nil {
+		return err
+	}
+
+	if err := validateAddress(c.GRPCAddress, "grpc server address"); err != nil {
+		return err
+	}
+
 	if _, err := url.ParseRequestURI(c.BaseURL); err != nil {
 		return fmt.Errorf("invalid base URL: %w", err)
+	}
+
+	if c.TrustedSubnet != "" {
+		if _, _, err := net.ParseCIDR(c.TrustedSubnet); err != nil {
+			return fmt.Errorf("invalid trusted subnet: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func validateAddress(address string, name string) error {
+	if strings.TrimSpace(address) == "" {
+		return fmt.Errorf("%s is required", name)
+	}
+
+	if _, _, err := net.SplitHostPort(address); err != nil {
+		return fmt.Errorf("invalid %s: %w", name, err)
 	}
 
 	return nil

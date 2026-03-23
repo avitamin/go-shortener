@@ -479,3 +479,130 @@ func TestShortenBatch_ElementInvalid(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
+
+func TestInternalStats(t *testing.T) {
+	t.Run("forbidden when trusted subnet empty", func(t *testing.T) {
+		repo := repository.NewInMemoryStorage()
+		svc := setupService(t, repo)
+		router, _ := setupRouter(t, svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "192.168.0.10")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	t.Run("forbidden when x-real-ip missing", func(t *testing.T) {
+		repo := repository.NewInMemoryStorage()
+		svc := setupService(t, repo)
+		svc.Config.TrustedSubnet = "192.168.0.0/24"
+		router, _ := setupRouter(t, svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	t.Run("forbidden when x-real-ip invalid", func(t *testing.T) {
+		repo := repository.NewInMemoryStorage()
+		svc := setupService(t, repo)
+		svc.Config.TrustedSubnet = "192.168.0.0/24"
+		router, _ := setupRouter(t, svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "not-an-ip")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	t.Run("forbidden when x-real-ip outside subnet", func(t *testing.T) {
+		repo := repository.NewInMemoryStorage()
+		svc := setupService(t, repo)
+		svc.Config.TrustedSubnet = "192.168.0.0/24"
+		router, _ := setupRouter(t, svc)
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "10.0.0.1")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+	})
+
+	t.Run("success when x-real-ip in subnet", func(t *testing.T) {
+		repo := repository.NewInMemoryStorage()
+		svc := setupService(t, repo)
+		svc.Config.TrustedSubnet = "192.168.0.0/24"
+		router, _ := setupRouter(t, svc)
+
+		if err := repo.Save(context.Background(), model.URL{Short: "a", Original: "https://a", UserID: "u1"}); err != nil {
+			t.Fatalf("save failed: %v", err)
+		}
+		if err := repo.Save(context.Background(), model.URL{Short: "b", Original: "https://b", UserID: "u2"}); err != nil {
+			t.Fatalf("save failed: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "192.168.0.10")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+		assert.Equal(t, "application/json", resp.Header.Get("Content-Type"))
+
+		var stats model.StatsResponse
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&stats))
+		assert.Equal(t, 2, stats.URLs)
+		assert.Equal(t, 2, stats.Users)
+	})
+
+	t.Run("internal error when repository stats fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		repo := mock_repository.NewMockRepository(ctrl)
+		defer repo.Close()
+
+		repo.EXPECT().GetStats(gomock.Any()).Return(0, 0, errors.New("db error"))
+		repo.EXPECT().Close().Return(nil).AnyTimes()
+
+		svc := setupService(t, repo)
+		svc.Config.TrustedSubnet = "192.168.0.0/24"
+
+		router, err := setupRouter(t, svc)
+		if err != nil {
+			t.Fatalf("failed to setup router: %v", err)
+		}
+
+		req := httptest.NewRequest(http.MethodGet, "/api/internal/stats", nil)
+		req.Header.Set("X-Real-IP", "192.168.0.10")
+		w := httptest.NewRecorder()
+
+		router.ServeHTTP(w, req)
+
+		resp := w.Result()
+		defer resp.Body.Close()
+		assert.Equal(t, http.StatusInternalServerError, resp.StatusCode)
+	})
+}

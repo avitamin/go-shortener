@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	authn "github.com/avitamin/go-shortener/internal/auth"
 	"github.com/avitamin/go-shortener/internal/model"
 	"go.uber.org/zap"
 )
@@ -46,7 +47,7 @@ func TestAuth_NoCookieCreatesSignedCookie(t *testing.T) {
 func TestAuth_ValidCookiePassesUser(t *testing.T) {
 	secret := "test-secret"
 	expectedID := "user-123"
-	sig := computeHMAC(expectedID, secret)
+	sig := authn.ComputeHMAC(expectedID, secret)
 
 	var gotID string
 	next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -108,11 +109,11 @@ func TestAuth_InvalidSignatureIssuesNewCookie(t *testing.T) {
 }
 
 func TestVerifySignature(t *testing.T) {
-	sig := computeHMAC("u1", "s1")
-	if !verifySignature("u1", sig, "s1") {
+	sig := authn.ComputeHMAC("u1", "s1")
+	if !authn.VerifySignature("u1", sig, "s1") {
 		t.Fatal("expected valid signature")
 	}
-	if verifySignature("u1", "wrong", "s1") {
+	if authn.VerifySignature("u1", "wrong", "s1") {
 		t.Fatal("expected invalid signature")
 	}
 }
